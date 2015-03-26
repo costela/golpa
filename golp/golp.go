@@ -111,6 +111,10 @@ func (model *Model) GetName() string {
 	return C.GoString(C.glp_get_prob_name(model.prob))
 }
 
+func (model Model) SetDirection(dir Direction) {
+	C.glp_set_obj_dir(model.prob, C.int(dir))
+}
+
 func (model *Model) GetDirection() Direction {
 	return Direction(C.glp_get_obj_dir(model.prob))
 }
