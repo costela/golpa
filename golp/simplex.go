@@ -50,7 +50,7 @@ func (model *Model) SolveSimplexDual() (res *SimplexResult, err error) {
 }
 
 func (model *Model) solveSimplex(method C.int) (result *SimplexResult, err error) {
-  result = new(SimplexResult)
+	result = new(SimplexResult)
 	result.model = model
 	model.loadMatrix()
 	var parm C.glp_smcp

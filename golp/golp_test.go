@@ -82,6 +82,10 @@ func TestSolveBranchCut(t *testing.T) {
 		expected_xs := []float64{40, 10.5, 19.5, 3}
 		expected_obj := 122.5
 
+		if res.GetStatus() != BranchCutSolutionOptimal {
+			t.Errorf("solution should have been optimal")
+		}
+
 		if res.GetObjectiveValue() != expected_obj {
 			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
 		}
@@ -108,6 +112,10 @@ func TestSolveSimplex(t *testing.T) {
 	} else {
 		expected_xs := []float64{5, 4, 0}
 		expected_obj := 13.0
+
+		if res.GetStatus() != SimplexSolutionOptimal {
+			t.Errorf("solution should have been optimal")
+		}
 
 		if res.GetObjectiveValue() != expected_obj {
 			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
