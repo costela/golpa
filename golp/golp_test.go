@@ -76,17 +76,19 @@ func TestSolveBranchCut(t *testing.T) {
     model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{1, -3, 1})
     model.AddConstraint(0, 0, []*Variable{x2, x4}, []float64{1, -3.5})
 
-    model.SolveBranchCut()
+    if err := model.SolveBranchCut(); err != nil {
+        t.Fatalf("model solving failed: %s", err)
+    }
 
     expected_xs := []float64{40, 10.5, 19.5, 3}
     expected_obj := 122.5
 
     if model.GetObjectiveValue() != expected_obj {
-        t.Fatalf("objective function value did not match expectation: %f != %f", model.GetObjectiveValue(), expected_obj)
+        t.Errorf("objective function value did not match expectation: %f != %f", model.GetObjectiveValue(), expected_obj)
     }
     for i, x := range []*Variable{x1, x2, x3, x4} {
         if x.GetValue() != expected_xs[i] {
-            t.Fatalf("result of $s did not match expectation: %f != %f", x.GetName(), x.GetValue(), expected_xs[i])
+            t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), x.GetValue(), expected_xs[i])
         }
     }
 }
@@ -95,23 +97,25 @@ func TestSolveSimplex(t *testing.T) {
     model := NewModel("test", Maximize)
     x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, math.Inf(1))
     x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
-    x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, -3, 0, math.Inf(1))
+    x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, -1, 0, math.Inf(1))
 
     model.AddConstraint(0, 14, []*Variable{x1, x2, x3}, []float64{2, 1, 1})
-    model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 1})
+    model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 3})
     model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{2, 5, 5})
 
-    model.SolveSimplex()
+    if err := model.SolveSimplex(); err != nil {
+        t.Fatalf("model solving failed: %s", err)
+    }
 
     expected_xs := []float64{5, 4, 0}
     expected_obj := 13.0
 
     if model.GetObjectiveValue() != expected_obj {
-        t.Fatalf("objective function value did not match expectation: %f != %f", model.GetObjectiveValue(), expected_obj)
+        t.Errorf("objective function value did not match expectation: %f != %f", model.GetObjectiveValue(), expected_obj)
     }
     for i, x := range []*Variable{x1, x2, x3} {
         if x.GetValue() != expected_xs[i] {
-            t.Fatalf("result of $s did not match expectation: %f != %f", x.GetName(), x.GetValue(), expected_xs[i])
+            t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), x.GetValue(), expected_xs[i])
         }
     }
 }
