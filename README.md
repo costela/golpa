@@ -1,4 +1,4 @@
-# Go Linear Programming library
+# Go Linear Programming library [![Build Status](https://travis-ci.org/costela/golp.svg)](https://travis-ci.org/costela/golp)
 
 Golp is a library for moddeling and solving linear programming problems. It uses [GLPK](https://www.gnu.org/software/glpk/) for the actual number crunching and offers a slightly higher-level interface for problem modelling relative to the underlying library.
 Since the intention is providing a simpler interface, the underlying API is not completely exposed. If there are features of the low-level library you'd like to see exposed by golp, please open an issue.
