@@ -70,6 +70,24 @@ func TestAddVariableWithDetails(t *testing.T) {
 	}
 }
 
+func TestSetObjectiveFunction(t *testing.T) {
+    model := NewModel("test", Maximize)
+	v1, _ := model.AddVariable("x")
+	v2, _ := model.AddVariable("y")
+    v2.SetType(IntegerVariable)
+	v3, _ := model.AddVariable("y")
+    v3.SetType(BinaryVariable)
+
+    vars := []*variable{v1, v2, v3}
+    coefs := []float64{1.3, 2.7182, 3.1416}
+    model.SetObjectiveFunction(coefs, vars)
+    for i, coef := range coefs {
+        if vars[i].GetCoefficient() != coef {
+            t.Fatalf("%s coefficient not set correctly while defining objective function", v1)
+        }
+    }
+}
+
 func TestSolveMIP(t *testing.T) {
 	model := NewModel("test", Maximize)
 	x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, 40)
@@ -77,9 +95,9 @@ func TestSolveMIP(t *testing.T) {
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, 3, 0, math.Inf(1))
 	x4, _ := model.AddDefinedVariable("x3", IntegerVariable, 1, 2, 3)
 
-	model.AddConstraint(0, 20, []*Variable{x1, x2, x3, x4}, []float64{-1, 1, 1, 10})
-	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{1, -3, 1})
-	model.AddConstraint(0, 0, []*Variable{x2, x4}, []float64{1, -3.5})
+	model.AddConstraint(0, 20, []*variable{x1, x2, x3, x4}, []float64{-1, 1, 1, 10})
+	model.AddConstraint(0, 30, []*variable{x1, x2, x3}, []float64{1, -3, 1})
+	model.AddConstraint(0, 0, []*variable{x2, x4}, []float64{1, -3.5})
 
 	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
@@ -95,7 +113,7 @@ func TestSolveMIP(t *testing.T) {
 		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
 			t.Errorf("objective function value did not match expectation: %v != %v", res.GetObjectiveValue(), expected_obj)
 		}
-		for i, x := range []*Variable{x1, x2, x3, x4} {
+		for i, x := range []*variable{x1, x2, x3, x4} {
 			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}
@@ -109,9 +127,9 @@ func TestSolveLP(t *testing.T) {
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, -1, 0, math.Inf(1))
 
-	model.AddConstraint(0, 14, []*Variable{x1, x2, x3}, []float64{2, 1, 1})
-	model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 3})
-	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{2, 5, 5})
+	model.AddConstraint(0, 14, []*variable{x1, x2, x3}, []float64{2, 1, 1})
+	model.AddConstraint(0, 28, []*variable{x1, x2, x3}, []float64{4, 2, 3})
+	model.AddConstraint(0, 30, []*variable{x1, x2, x3}, []float64{2, 5, 5})
 
 	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
@@ -127,7 +145,7 @@ func TestSolveLP(t *testing.T) {
 		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
 			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
 		}
-		for i, x := range []*Variable{x1, x2, x3} {
+		for i, x := range []*variable{x1, x2, x3} {
 			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}

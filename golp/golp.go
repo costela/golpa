@@ -33,7 +33,7 @@ import (
 
 type Model struct {
 	prob *C.lprec
-	vars []*Variable
+	vars []*variable
 }
 
 type direction C.uchar
@@ -97,7 +97,7 @@ func (model *Model) GetVariableCount() int {
 	return int(C.get_Ncolumns(model.prob))
 }
 
-func (model *Model) GetVariables() []*Variable {
+func (model *Model) GetVariables() []*variable {
 	return model.vars
 }
 
@@ -109,29 +109,29 @@ func (model *Model) GetVariables() []*Variable {
 // A variable is bound to its model. Attempting to use a variable
 // created in one model for fetching solutions from a different model
 // results in undefined behaviour.
-func (model *Model) AddVariable(name string) (v *Variable, err error) {
+func (model *Model) AddVariable(name string) (v *variable, err error) {
 	return model.AddDefinedVariable(name, ContinuousVariable, 1, math.Inf(-1), math.Inf(1))
 }
 
 // AddBinaryVariable is a convenience function for adding a single
 // named binary variable to the model, with a default coefficient of 1.
-func (model *Model) AddBinaryVariable(name string) (v *Variable, err error) {
+func (model *Model) AddBinaryVariable(name string) (v *variable, err error) {
 	return model.AddDefinedVariable(name, BinaryVariable, 1, 0, 1)
 }
 
 // AddIntegerVariable is a convenience function for adding a single
 // named unbounded integer variable to the model, with a default
 // objective coefficient of 1.
-func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
+func (model *Model) AddIntegerVariable(name string) (v *variable, err error) {
 	return model.AddDefinedVariable(name, IntegerVariable, 1, math.Inf(-1), math.Inf(1))
 }
 
 // AddDefinedVariable add a variable to the linear programming model
 // with its attributes passed as arguments.
 // If varType is BinaryVariable, the bounds are ignored.
-func (model *Model) AddDefinedVariable(name string, varType variableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
+func (model *Model) AddDefinedVariable(name string, varType variableType, coefficient, lowerBound, upperBound float64) (v *variable, err error) {
 	size := model.GetVariableCount()
-	v = new(Variable)
+	v = new(variable)
 	v.index = size
 	v.model = model
 	model.vars = append(model.vars, v)
@@ -155,13 +155,20 @@ func (model *Model) AddDefinedVariable(name string, varType variableType, coeffi
 	return
 }
 
+func (model *Model) SetObjectiveFunction(coefs []float64, vars []*variable) error {
+    for i, v := range vars {
+        v.SetObjectiveCoefficient(coefs[i])
+    }
+    return nil
+}
+
 /* Constraint-related functions */
 
 func (model *Model) GetConstraintCount() int {
 	return int(C.get_Nrows(model.prob))
 }
 
-func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs []float64) error {
+func (model *Model) AddConstraint(lower, upper float64, vars []*variable, coefs []float64) error {
 	if len(vars) != len(coefs) {
 		return fmt.Errorf("inconsistent number of variables and coefficients: %d != %d", len(vars), len(coefs))
 	}
@@ -190,65 +197,6 @@ func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs 
 	return nil
 }
 
-type solveResult struct {
-	model  *Model
-	status solveStatus
-}
-
-type solveStatus C.int
-
-const (
-	SolutionOptimal    = solveStatus(C.OPTIMAL)
-	SolutionSuboptimal = solveStatus(C.SUBOPTIMAL)
-)
-
-type solveError C.int
-
-const (
-	ErrorModelInfeasible  = solveError(C.INFEASIBLE)
-	ErrorModelUnbounded   = solveError(C.UNBOUNDED)
-	ErrorModelDegenerate  = solveError(C.DEGENERATE)
-	ErrorNumericalFailure = solveError(C.NUMFAILURE)
-	ErrorUserAbort        = solveError(C.USERABORT) // we don't use C.put_abortfunc
-	ErrorTimeout          = solveError(C.TIMEOUT)   // FIXME: support C.set_timeout
-	//ErrorPresolved        = solveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove Variables
-	ErrorBranchCutFail   = solveError(C.PROCFAIL)
-	ErrorBranchCutBreak  = solveError(C.PROCBREAK) // we don't use set_break_at_first/set_break_at_value
-	ErrorFeasibleFound   = solveError(C.FEASFOUND)
-	ErrorNoFeasibleFound = solveError(C.NOFEASFOUND)
-	ErrorNoMemory        = solveError(C.NOMEMORY)
-)
-
-func (e solveError) Error() string {
-	switch e {
-	case ErrorModelInfeasible:
-		return "model is infeasible"
-	case ErrorModelUnbounded:
-		return "model is unbounded"
-	case ErrorModelDegenerate:
-		return "model is degenerate"
-	case ErrorNumericalFailure:
-		return "numerical failure while solving"
-	case ErrorUserAbort:
-		return "aborted by user abort function "
-	case ErrorTimeout:
-		return "timeout occurred before any integer solution could be found"
-	//case ErrorPresolved:
-	case ErrorBranchCutFail:
-		return "branch-and-cut failure"
-	case ErrorBranchCutBreak:
-		return "branch-and-cut stopped at beakpoint"
-	case ErrorFeasibleFound:
-		return "feasible but non-integer solution found"
-	case ErrorNoFeasibleFound:
-		return "no feasible solution found"
-	case ErrorNoMemory:
-		return "ran out of memory while solving"
-	default:
-		panic("unrecognized error")
-	}
-}
-
 // Solve attempts to find an optimal solution to the model.
 func (model *Model) Solve() (res *solveResult, err error) {
 	res = new(solveResult)
@@ -267,30 +215,4 @@ func (model *Model) Solve() (res *solveResult, err error) {
 	default:
 		panic("unrecognized result")
 	}
-}
-
-/* Result-related functions */
-
-// GetStatus reports if the solution is optimal (SolutionOptimal) or
-// not (SolutionSuboptimal)
-func (res solveResult) GetStatus() solveStatus {
-	return res.status
-}
-
-func (res solveResult) GetValue(v *Variable) float64 {
-	return res.GetPrimalValue(v)
-}
-
-func (res solveResult) GetPrimalValue(v *Variable) float64 {
-	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
-	return float64(C.get_var_primalresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
-}
-
-func (res solveResult) GetDualValue(v *Variable) float64 {
-	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
-	return float64(C.get_var_dualresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
-}
-
-func (res solveResult) GetObjectiveValue() float64 {
-	return float64(C.get_objective(res.model.prob))
 }
