@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package golp
 
-// #cgo LDFLAGS: -lglpk
-// #include <glpk.h>
+// #cgo CFLAGS: -I/usr/include/lpsolve/
+// #cgo LDFLAGS: -llpsolve55 -lm -ldl -lcolamd
+// #include <lp_lib.h>
 // #include <stdlib.h>
 import "C"
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -32,26 +32,41 @@ type Variable struct {
 	index int
 }
 
-type VariableType C.int
+type variableType int
 
 const (
-	ContinuousVariable = VariableType(C.GLP_CV)
-	IntegerVariable    = VariableType(C.GLP_IV)
-	BinaryVariable     = VariableType(C.GLP_BV)
+	ContinuousVariable = iota
+	IntegerVariable
+	BinaryVariable
 )
 
 /* Variable-related functions (model variables, as opposed to Go variables) */
 
 func (v *Variable) GetName() string {
-	return C.GoString(C.glp_get_col_name(v.model.prob, C.int(v.index+1)))
+	return C.GoString(C.get_col_name(v.model.prob, C.int(v.index+1)))
 }
 
-func (v *Variable) SetType(vartype VariableType) {
-	C.glp_set_col_kind(v.model.prob, C.int(v.index+1), C.int(vartype))
+func (v *Variable) SetType(vartype variableType) {
+	switch vartype {
+	case ContinuousVariable:
+		C.set_int(v.model.prob, C.int(v.index+1), C.FALSE)
+	case IntegerVariable:
+		C.set_int(v.model.prob, C.int(v.index+1), C.TRUE)
+	case BinaryVariable:
+		C.set_binary(v.model.prob, C.int(v.index+1), C.TRUE)
+	default:
+		panic("unrecognized variable type!")
+	}
 }
 
-func (v *Variable) GetType() VariableType {
-	return VariableType(C.glp_get_col_kind(v.model.prob, C.int(v.index+1)))
+func (v *Variable) GetType() variableType {
+	if C.is_binary(v.model.prob, C.int(v.index+1)) == C.TRUE {
+		return BinaryVariable
+	} else if C.is_int(v.model.prob, C.int(v.index+1)) == C.TRUE {
+		return IntegerVariable
+	} else {
+		return ContinuousVariable
+	}
 }
 
 // SetBounds sets the boundaries for the given variable.
@@ -62,51 +77,37 @@ func (v *Variable) GetType() VariableType {
 func (v *Variable) SetBounds(lower, upper float64) {
 	switch {
 	case math.IsInf(lower, 0) && math.IsInf(upper, 0):
-		C.glp_set_col_bnds(v.model.prob, C.int(v.index+1), C.GLP_FR, C.double(0), C.double(0))
+		C.set_unbounded(v.model.prob, C.int(v.index+1))
 	case math.IsInf(lower, 0):
-		C.glp_set_col_bnds(v.model.prob, C.int(v.index+1), C.GLP_UP, C.double(0), C.double(upper))
+		C.set_unbounded(v.model.prob, C.int(v.index+1))
+		C.set_upbo(v.model.prob, C.int(v.index+1), C.double(upper))
 	case math.IsInf(upper, 0):
-		C.glp_set_col_bnds(v.model.prob, C.int(v.index+1), C.GLP_LO, C.double(lower), C.double(0))
-	case upper == lower:
-		C.glp_set_col_bnds(v.model.prob, C.int(v.index+1), C.GLP_FX, C.double(lower), C.double(upper))
+		C.set_unbounded(v.model.prob, C.int(v.index+1))
+		C.set_lowbo(v.model.prob, C.int(v.index+1), C.double(lower))
 	default:
-		C.glp_set_col_bnds(v.model.prob, C.int(v.index+1), C.GLP_DB, C.double(lower), C.double(upper))
+		C.set_bounds(v.model.prob, C.int(v.index+1), C.double(lower), C.double(upper))
 	}
 }
 
 func (v *Variable) GetBounds() (lower, upper float64) {
-	bound_type := C.glp_get_col_type(v.model.prob, C.int(v.index+1))
+	lower = float64(C.get_lowbo(v.model.prob, C.int(v.index+1)))
+	upper = float64(C.get_upbo(v.model.prob, C.int(v.index+1)))
 
-	lower = math.Inf(-1)
-	upper = math.Inf(1)
+	inf := float64(C.get_infinite(v.model.prob))
 
-	switch bound_type {
-	case C.GLP_FR:
-		return
-	case C.GLP_UP:
-		upper = float64(C.glp_get_col_ub(v.model.prob, C.int(v.index+1)))
-		return
-	case C.GLP_LO:
-		lower = float64(C.glp_get_col_lb(v.model.prob, C.int(v.index+1)))
-		return
-	case C.GLP_FX:
-		// according to the glpk docs, only lb is used for fixed bounds
-		lower = float64(C.glp_get_col_lb(v.model.prob, C.int(v.index+1)))
-		upper = float64(C.glp_get_col_lb(v.model.prob, C.int(v.index+1)))
-		return
-	case C.GLP_DB:
-		lower = float64(C.glp_get_col_lb(v.model.prob, C.int(v.index+1)))
-		upper = float64(C.glp_get_col_ub(v.model.prob, C.int(v.index+1)))
-		return
-	default:
-		panic(fmt.Sprintf("unsupported bound type %v", bound_type))
+	if lower == -inf {
+		lower = math.Inf(-1)
 	}
+	if upper == inf {
+		upper = math.Inf(1)
+	}
+	return
 }
 
-func (v *Variable) SetCoefficient(coef float64) {
-	C.glp_set_obj_coef(v.model.prob, C.int(v.index+1), C.double(coef))
+func (v *Variable) SetObjectiveCoefficient(coef float64) {
+	C.set_mat(v.model.prob, C.int(0), C.int(v.index+1), C.REAL(coef))
 }
 
 func (v *Variable) GetCoefficient() float64 {
-	return float64(C.glp_get_obj_coef(v.model.prob, C.int(v.index+1)))
+	return float64(C.get_mat(v.model.prob, C.int(0), C.int(v.index+1)))
 }

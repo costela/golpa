@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package golp
 
-// #cgo LDFLAGS: -lglpk
-// #include <glpk.h>
+// #cgo CFLAGS: -I/usr/include/lpsolve/
+// #cgo LDFLAGS: -llpsolve55 -lm -ldl -lcolamd
+// #include <lp_lib.h>
 // #include <stdlib.h>
 import "C"
 import (
@@ -31,107 +32,83 @@ import (
 /* Types */
 
 type Model struct {
-	prob     *C.glp_prob
-	vars     []*Variable
-	ia       []C.int
-	ja       []C.int
-	ar       []C.double
-	Verbose  bool
-	Presolve bool
+	prob *C.lprec
+	vars []*Variable
 }
 
-type Direction C.int
+type direction C.uchar
 
 const (
-	Minimize = Direction(C.GLP_MIN)
-	Maximize = Direction(C.GLP_MAX)
-)
-
-type BoundType C.int
-
-const (
-	NoBound     = BoundType(C.GLP_FR)
-	UpperBound  = BoundType(C.GLP_UP)
-	LowerBound  = BoundType(C.GLP_LO)
-	DoubleBound = BoundType(C.GLP_DB)
-	FixedBound  = BoundType(C.GLP_FX)
+	Minimize = direction(C.FALSE)
+	Maximize = direction(C.TRUE)
 )
 
 /* Model related functions */
 
-func NewModel(name string, dir Direction) Model {
-	prob := C.glp_create_prob()
+func NewModel(name string, dir direction) *Model {
+	prob := C.make_lp(0, 0)
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
-	C.glp_set_prob_name(prob, c_name)
-	C.glp_set_obj_dir(prob, C.int(dir))
+	C.set_lp_name(prob, c_name)
+	C.set_sense(prob, C.uchar(dir))
 
-	model := Model{prob: prob}
-	// glpk indices start at 1; index 0 is reserved
-	model.ia = append(model.ia, 0)
-	model.ja = append(model.ja, 0)
-	model.ar = append(model.ar, 0.0)
+	model := &Model{prob: prob}
 
-	model.Verbose = false
-	model.Presolve = true
+	C.set_verbose(prob, C.FALSE) // FIXME: use put_logfunc to *really* silence the lib
 
 	// plug the underlying C library's destructors to the instance of Model,
 	// otherwise we get a memory-leak of the underlying struct
-	runtime.SetFinalizer(&model, finalizeModel)
+	runtime.SetFinalizer(model, finalizeModel)
 
 	return model
 }
 
 func finalizeModel(model *Model) {
-	C.glp_delete_prob(model.prob)
+	C.delete_lp(model.prob)
 }
 
-func NewMaximizeModel(name string) Model {
+func NewMaximizeModel(name string) *Model {
 	return NewModel(name, Maximize)
 }
 
-func NewMinimizeModel(name string) Model {
+func NewMinimizeModel(name string) *Model {
 	return NewModel(name, Minimize)
 }
 
 func (model *Model) GetName() string {
-	return C.GoString(C.glp_get_prob_name(model.prob))
+	return C.GoString(C.get_lp_name(model.prob))
 }
 
-func (model Model) SetDirection(dir Direction) {
-	C.glp_set_obj_dir(model.prob, C.int(dir))
+func (model Model) SetDirection(dir direction) {
+	C.set_sense(model.prob, C.uchar(dir))
 }
 
-func (model *Model) GetDirection() Direction {
-	return Direction(C.glp_get_obj_dir(model.prob))
+func (model *Model) GetDirection() direction {
+	if C.is_maxim(model.prob) == C.TRUE {
+		return Maximize
+	} else {
+		return Minimize
+	}
 }
 
 /* Column-related functions */
 
 func (model *Model) GetVariableCount() int {
-	return int(C.glp_get_num_cols(model.prob))
-}
-
-func (model *Model) setColumnCount(n int) (err error) {
-	current_columns := model.GetVariableCount()
-	if current_columns < n {
-		if ret := C.glp_add_cols(model.prob, C.int(n-current_columns)); ret < 1 {
-			return fmt.Errorf("could not scale columns for model")
-		}
-	} else if current_columns > n {
-		// TODO: we could probably handle this more elegantly
-		return fmt.Errorf("reducing column-count not supported")
-	} // current_columns == n → noop
-	return
+	return int(C.get_Ncolumns(model.prob))
 }
 
 func (model *Model) GetVariables() []*Variable {
 	return model.vars
 }
 
-// AddVariable adds a variable to the linear programming model.
+// AddVariable adds a variable to the linear programming model and
+// returns a reference to it.
 // A freshly instantiated variable has the default type of
-// ContinuousVariable, no bounds and a coefficient of 1.
+// ContinuousVariable, no bounds and an objective coefficient of 1.
+//
+// A variable is bound to its model. Attempting to use a variable
+// created in one model for fetching solutions from a different model
+// results in undefined behaviour.
 func (model *Model) AddVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, ContinuousVariable, 1, math.Inf(-1), math.Inf(1))
 }
@@ -144,7 +121,7 @@ func (model *Model) AddBinaryVariable(name string) (v *Variable, err error) {
 
 // AddIntegerVariable is a convenience function for adding a single
 // named unbounded integer variable to the model, with a default
-// coefficient of 1.
+// objective coefficient of 1.
 func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, IntegerVariable, 1, math.Inf(-1), math.Inf(1))
 }
@@ -152,21 +129,25 @@ func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 // AddDefinedVariable add a variable to the linear programming model
 // with its attributes passed as arguments.
 // If varType is BinaryVariable, the bounds are ignored.
-func (model *Model) AddDefinedVariable(name string, varType VariableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
+func (model *Model) AddDefinedVariable(name string, varType variableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
 	size := model.GetVariableCount()
-	if err = model.setColumnCount(size + 1); err != nil {
-		return
-	}
 	v = new(Variable)
 	v.index = size
 	v.model = model
 	model.vars = append(model.vars, v)
 
+	// when adding a variable after some constraints have been defined,
+	// we pass an array filled with zeroes to add_column, so the new
+	// variable is assumed to not be used in the existing constraints
+	C.add_columnex(model.prob, 0, nil, nil)
+	//coef_array := make([]C.REAL, model.GetConstraintCount()+1)
+	//C.add_column(model.prob, &coef_array[0])
+
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
-	C.glp_set_col_name(model.prob, C.int(v.index+1), c_name)
+	C.set_col_name(model.prob, C.int(v.index+1), c_name)
 	v.SetType(varType)
-	v.SetCoefficient(coefficient)
+	v.SetObjectiveCoefficient(coefficient)
 	if varType != BinaryVariable {
 		v.SetBounds(lowerBound, upperBound)
 	}
@@ -177,20 +158,7 @@ func (model *Model) AddDefinedVariable(name string, varType VariableType, coeffi
 /* Constraint-related functions */
 
 func (model *Model) GetConstraintCount() int {
-	return int(C.glp_get_num_rows(model.prob))
-}
-
-func (model *Model) setRowCount(n int) (err error) {
-	current_rows := model.GetConstraintCount()
-	if current_rows < n {
-		if ret := C.glp_add_rows(model.prob, C.int(n-current_rows)); ret < 1 {
-			return fmt.Errorf("could not scale rows for model")
-		}
-	} else if current_rows > n {
-		// TODO: we could probably handle this more elegantly
-		return fmt.Errorf("reducing row-count not supported")
-	} // current_rows == n → noop
-	return
+	return int(C.get_Nrows(model.prob))
 }
 
 func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs []float64) error {
@@ -198,60 +166,131 @@ func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs 
 		return fmt.Errorf("inconsistent number of variables and coefficients: %d != %d", len(vars), len(coefs))
 	}
 
-	size := model.GetConstraintCount()
-	if err := model.setRowCount(size + 1); err != nil {
-		return err
-	}
-	switch {
-	case math.IsInf(lower, 0) && math.IsInf(upper, 0):
-		C.glp_set_row_bnds(model.prob, C.int(size+1), C.GLP_FR, C.double(0), C.double(0))
-	case math.IsInf(lower, 0):
-		C.glp_set_row_bnds(model.prob, C.int(size+1), C.GLP_UP, C.double(0), C.double(upper))
-	case math.IsInf(upper, 0):
-		C.glp_set_row_bnds(model.prob, C.int(size+1), C.GLP_LO, C.double(lower), C.double(0))
-	case upper == lower:
-		C.glp_set_row_bnds(model.prob, C.int(size+1), C.GLP_FX, C.double(lower), C.double(upper))
-	default:
-		C.glp_set_row_bnds(model.prob, C.int(size+1), C.GLP_DB, C.double(lower), C.double(upper))
+	row := make([]C.REAL, len(vars))
+	colno := make([]C.int, len(vars))
+	for i, v := range vars {
+		colno[i] = C.int(v.index + 1)
+		row[i] = C.REAL(coefs[i])
 	}
 
-	for i, v := range vars {
-		model.ia = append(model.ia, C.int(size+1))
-		model.ja = append(model.ja, C.int(v.index+1))
-		model.ar = append(model.ar, C.double(coefs[i]))
+	switch {
+	case math.IsInf(lower, 0) && math.IsInf(upper, 0):
+		// no constraints
+	case math.IsInf(lower, 0):
+		C.add_constraintex(model.prob, C.int(len(vars)), &row[0], &colno[0], C.LE, C.double(upper))
+	case math.IsInf(upper, 0):
+		C.add_constraintex(model.prob, C.int(len(vars)), &row[0], &colno[0], C.GE, C.double(lower))
+	case upper == lower:
+		C.add_constraintex(model.prob, C.int(len(vars)), &row[0], &colno[0], C.EQ, C.double(upper))
+	default:
+		C.add_constraintex(model.prob, C.int(len(vars)), &row[0], &colno[0], C.LE, C.double(upper))
+		C.add_constraintex(model.prob, C.int(len(vars)), &row[0], &colno[0], C.GE, C.double(lower))
 	}
+
 	return nil
 }
 
-func (model *Model) loadMatrix() {
-	C.glp_load_matrix(model.prob, C.int(len(model.ia)-1), &model.ia[0], &model.ja[0], &model.ar[0])
+type solveResult struct {
+	model  *Model
+	status solveStatus
 }
 
-func glpkError(err C.int) error {
-	switch err {
-	case 0:
-		return nil
-	case C.GLP_EBADB:
-		return fmt.Errorf("initial basis invalid")
-	case C.GLP_ESING:
-		return fmt.Errorf("initial basis is exactly singular")
-	case C.GLP_EBOUND:
-		return fmt.Errorf("double-bounded (auxiliary or structural) variables has incorrect bounds")
-	case C.GLP_EFAIL:
-		return fmt.Errorf("problem instance has no rows/columns")
-	case C.GLP_EITLIM:
-		return fmt.Errorf("simplex iteration limit exceeded")
-	case C.GLP_ETMLIM:
-		return fmt.Errorf("time limit exceeded")
-	case C.GLP_EROOT:
-		return fmt.Errorf("optimal basis for initial LP relaxation not provided and presolver not used")
-	case C.GLP_ENOPFS:
-		return fmt.Errorf("LP relaxation of MIP problem has no primal feasible solution")
-	case C.GLP_ENODFS:
-		return fmt.Errorf("LP relaxation of MIP problem has no dual feasible solution")
-	case C.GLP_EMIPGAP:
-		return fmt.Errorf("MIP gap tolerance exceeded")
+type solveStatus C.int
+
+const (
+	SolutionOptimal    = solveStatus(C.OPTIMAL)
+	SolutionSuboptimal = solveStatus(C.SUBOPTIMAL)
+)
+
+type solveError C.int
+
+const (
+	ErrorModelInfeasible  = solveError(C.INFEASIBLE)
+	ErrorModelUnbounded   = solveError(C.UNBOUNDED)
+	ErrorModelDegenerate  = solveError(C.DEGENERATE)
+	ErrorNumericalFailure = solveError(C.NUMFAILURE)
+	ErrorUserAbort        = solveError(C.USERABORT) // we don't use C.put_abortfunc
+	ErrorTimeout          = solveError(C.TIMEOUT)   // FIXME: support C.set_timeout
+	//ErrorPresolved        = solveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove Variables
+	ErrorBranchCutFail   = solveError(C.PROCFAIL)
+	ErrorBranchCutBreak  = solveError(C.PROCBREAK) // we don't use set_break_at_first/set_break_at_value
+	ErrorFeasibleFound   = solveError(C.FEASFOUND)
+	ErrorNoFeasibleFound = solveError(C.NOFEASFOUND)
+	ErrorNoMemory        = solveError(C.NOMEMORY)
+)
+
+func (e solveError) Error() string {
+	switch e {
+	case ErrorModelInfeasible:
+		return "model is infeasible"
+	case ErrorModelUnbounded:
+		return "model is unbounded"
+	case ErrorModelDegenerate:
+		return "model is degenerate"
+	case ErrorNumericalFailure:
+		return "numerical failure while solving"
+	case ErrorUserAbort:
+		return "aborted by user abort function "
+	case ErrorTimeout:
+		return "timeout occurred before any integer solution could be found"
+	//case ErrorPresolved:
+	case ErrorBranchCutFail:
+		return "branch-and-cut failure"
+	case ErrorBranchCutBreak:
+		return "branch-and-cut stopped at beakpoint"
+	case ErrorFeasibleFound:
+		return "feasible but non-integer solution found"
+	case ErrorNoFeasibleFound:
+		return "no feasible solution found"
+	case ErrorNoMemory:
+		return "ran out of memory while solving"
 	default:
-		return fmt.Errorf("unknown glpk error: %d", err)
+		panic("unrecognized error")
 	}
+}
+
+// Solve attempts to find an optimal solution to the model.
+func (model *Model) Solve() (res *solveResult, err error) {
+	res = new(solveResult)
+	res.model = model
+
+	ret := C.solve(model.prob)
+
+	switch ret {
+	case C.OPTIMAL, C.SUBOPTIMAL:
+		res.status = solveStatus(ret)
+		return res, nil
+	case C.INFEASIBLE, C.UNBOUNDED, C.DEGENERATE, C.NUMFAILURE,
+		C.USERABORT, C.TIMEOUT, C.PROCFAIL, C.PROCBREAK, C.FEASFOUND,
+		C.NOFEASFOUND, C.NOMEMORY:
+		return nil, solveError(ret)
+	default:
+		panic("unrecognized result")
+	}
+}
+
+/* Result-related functions */
+
+// GetStatus reports if the solution is optimal (SolutionOptimal) or
+// not (SolutionSuboptimal)
+func (res solveResult) GetStatus() solveStatus {
+	return res.status
+}
+
+func (res solveResult) GetValue(v *Variable) float64 {
+	return res.GetPrimalValue(v)
+}
+
+func (res solveResult) GetPrimalValue(v *Variable) float64 {
+	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
+	return float64(C.get_var_primalresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
+}
+
+func (res solveResult) GetDualValue(v *Variable) float64 {
+	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
+	return float64(C.get_var_dualresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
+}
+
+func (res solveResult) GetObjectiveValue() float64 {
+	return float64(C.get_objective(res.model.prob))
 }

@@ -1,13 +1,13 @@
 # Go Linear Programming library [![Build Status](https://travis-ci.org/costela/golp.svg)](https://travis-ci.org/costela/golp)
 
-Golp is a library for moddeling and solving linear programming problems. It uses [GLPK](https://www.gnu.org/software/glpk/) for the actual number crunching and offers a slightly higher-level interface for problem modelling relative to the underlying library.
+Golp is a library for moddeling and solving linear programming problems. It uses [lp\_solve](http://lpsolve.sourceforge.net) for the actual number crunching and offers a slightly higher-level interface for problem modelling relative to the underlying library.
 Since the intention is providing a simpler interface, the underlying API is not completely exposed. If there are features of the low-level library you'd like to see exposed by golp, please open an issue.
 
 **Warning**: the API is currently not stable.
 
 # Dependencies
 
-You need the libglpk-dev (Debian variants) or glpk-devel (Red Hat variants) package installed in order to be able to compile golp.
+You need the liblpsolve55-dev (Debian variants) or lpsolve-devel (Red Hat variants) package installed in order to be able to compile golp.
 
 # Installing
 
@@ -16,11 +16,6 @@ If you have a properly set up GOPATH, just run:
 ```bash
 $ go get github.com/costela/golp/golp
 ```
-
-# Known Problems
-
-The underlying C library is not reentrant and therefore models cannot be safely solved by two separate goroutines.
-The current version of the library does not attempt to shield the user from this limitation.
 
 # Example usage
 
@@ -54,7 +49,8 @@ func main() {
   x1, _ := model.AddVariable("x1")
   x1.SetBounds(0, 40)
   x2, _ := model.AddVariable("x2")
-  // alternatively, all variable-related information can be given at once:
+  x2.SetObjectiveCoefficient(2)
+  // alternatively, all information pertaining can be given at once:
   x3, _ := model.AddDefinedVariable("x3", golp.ContinuousVariable, 3, 5, 11)
 
   model.AddConstraint(0, 10, []*golp.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
@@ -67,8 +63,9 @@ The model can than be solved and the resulting values can than be retrieved as f
 
 ```go
   ⋮
-  result, _ := model.SolveSimplex() // you should check for errors
+  result, _ := model.Solve() // you should check for errors
 
+  fmt.Printf("solution optimal? %t", result.GetStatus() == golp.SolutionOptimal)
   fmt.Printf("z = %f\n", result.GetObjectiveValue())
   fmt.Printf("x1 = %f\n", result.GetValue(x1))
   ⋮

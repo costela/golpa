@@ -18,9 +18,14 @@ package golp
 
 import (
 	"math"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
+)
+
+const (
+	epsilon = 0.0000001 // acceptable numerical deviation for test results
 )
 
 func TestInstantiation(t *testing.T) {
@@ -65,7 +70,7 @@ func TestAddVariableWithDetails(t *testing.T) {
 	}
 }
 
-func TestSolveBranchCut(t *testing.T) {
+func TestSolveMIP(t *testing.T) {
 	model := NewModel("test", Maximize)
 	x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, 40)
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
@@ -76,28 +81,29 @@ func TestSolveBranchCut(t *testing.T) {
 	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{1, -3, 1})
 	model.AddConstraint(0, 0, []*Variable{x2, x4}, []float64{1, -3.5})
 
-	if res, err := model.SolveBranchCut(); err != nil {
+	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
 	} else {
 		expected_xs := []float64{40, 10.5, 19.5, 3}
 		expected_obj := 122.5
 
-		if res.GetStatus() != BranchCutSolutionOptimal {
+		if res.GetStatus() != SolutionOptimal {
 			t.Errorf("solution should have been optimal")
 		}
 
-		if res.GetObjectiveValue() != expected_obj {
-			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
+		// ignore numerical inaccuracies
+		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
+			t.Errorf("objective function value did not match expectation: %v != %v", res.GetObjectiveValue(), expected_obj)
 		}
 		for i, x := range []*Variable{x1, x2, x3, x4} {
-			if res.GetValue(x) != expected_xs[i] {
+			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}
 		}
 	}
 }
 
-func TestSolveSimplex(t *testing.T) {
+func TestSolveLP(t *testing.T) {
 	model := NewModel("test", Maximize)
 	x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, math.Inf(1))
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
@@ -107,21 +113,22 @@ func TestSolveSimplex(t *testing.T) {
 	model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 3})
 	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{2, 5, 5})
 
-	if res, err := model.SolveSimplex(); err != nil {
+	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
 	} else {
 		expected_xs := []float64{5, 4, 0}
 		expected_obj := 13.0
 
-		if res.GetStatus() != SimplexSolutionOptimal {
+		if res.GetStatus() != SolutionOptimal {
 			t.Errorf("solution should have been optimal")
 		}
 
-		if res.GetObjectiveValue() != expected_obj {
+		// ignore numerical inaccuracies
+		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
 			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
 		}
 		for i, x := range []*Variable{x1, x2, x3} {
-			if res.GetValue(x) != expected_xs[i] {
+			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}
 		}
@@ -135,9 +142,10 @@ func BenchmarkMemoryLeaks(b *testing.B) {
 		b.SkipNow()
 	}
 	b.ReportAllocs()
-	const n = 1000000
+	const n = 100000
 	for i := 0; i < n; i++ {
 		NewModel(strconv.Itoa(i), Minimize)
 	}
-	time.Sleep(5 * time.Second)
+	runtime.GC()
+	time.Sleep(10 * time.Second)
 }
