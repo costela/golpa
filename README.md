@@ -33,7 +33,7 @@ Subject to:
   x2 - 8 x3 = 0
 ```
 
-can be expressed with Golp like this:
+can be expressed with GoLPA like this:
 
 ```go
 package main
@@ -45,7 +45,7 @@ import (
 )
 
 func main() {
-  model := golpa.NewModel("some model", golp.Maximize)
+  model := golpa.NewModel("some model", golpa.Maximize)
   x1, _ := model.AddVariable("x1")
   x1.SetBounds(0, 40)
   x2, _ := model.AddVariable("x2")
