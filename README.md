@@ -1,20 +1,20 @@
-# Go Linear Programming library [![Build Status](https://travis-ci.org/costela/golp.svg)](https://travis-ci.org/costela/golp)
+# GO Linear Programming Abstraction [![Build Status](https://travis-ci.org/costela/golpa.svg)](https://travis-ci.org/costela/golpa)
 
-Golp is a library for moddeling and solving linear programming problems. It uses [lp\_solve](http://lpsolve.sourceforge.net) for the actual number crunching and offers a slightly higher-level interface for problem modelling relative to the underlying library.
-Since the intention is providing a simpler interface, the underlying API is not completely exposed. If there are features of the low-level library you'd like to see exposed by golp, please open an issue.
+GoLPA is a library for moddeling and solving linear programming problems. It uses [lp\_solve](http://lpsolve.sourceforge.net) for the actual number crunching, but offers a slightly higher-level interface for problem modelling relative to the underlying library.
+Since the intention is providing a simpler interface, the underlying API is not completely exposed. If there are features of the low-level library you'd like to see exposed by GoLPA, please open an issue.
 
 **Warning**: the API is currently not stable.
 
 # Dependencies
 
-You need the liblpsolve55-dev (Debian variants) or lpsolve-devel (Red Hat variants) package installed in order to be able to compile golp.
+You need the liblpsolve55-dev (Debian variants) or lpsolve-devel (Red Hat variants) package installed in order to be able to compile GoLPA.
 
 # Installing
 
 If you have a properly set up GOPATH, just run:
 
 ```bash
-$ go get github.com/costela/golp/golp
+$ go get github.com/costela/golpa/golpa
 ```
 
 # Example usage
@@ -39,23 +39,23 @@ can be expressed with Golp like this:
 package main
 
 import (
-    "github.com/costela/golp/golp"
+    "github.com/costela/golpa/golpa"
     "math"
     "fmt"
 )
 
 func main() {
-  model := golp.NewModel("some model", golp.Maximize)
+  model := golpa.NewModel("some model", golp.Maximize)
   x1, _ := model.AddVariable("x1")
   x1.SetBounds(0, 40)
   x2, _ := model.AddVariable("x2")
   x2.SetObjectiveCoefficient(2)
   // alternatively, all information pertaining can be given at once:
-  x3, _ := model.AddDefinedVariable("x3", golp.ContinuousVariable, 3, 5, 11)
+  x3, _ := model.AddDefinedVariable("x3", golpa.ContinuousVariable, 3, 5, 11)
 
-  model.AddConstraint(0, 10, []*golp.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
-  model.AddConstraint(math.Inf(-1), 20, []*golp.Variable{x1, x2, x3}, []float64{2, -5, 3})
-  model.AddConstraint(0, 0, []*golp.Variable{x1, x3}, []float64{1, -8})
+  model.AddConstraint(0, 10, []*golpa.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
+  model.AddConstraint(math.Inf(-1), 20, []*golpa.Variable{x1, x2, x3}, []float64{2, -5, 3})
+  model.AddConstraint(0, 0, []*golpa.Variable{x1, x3}, []float64{1, -8})
   ⋮
 ```
 
@@ -65,7 +65,7 @@ The model can than be solved and the resulting values can than be retrieved as f
   ⋮
   result, _ := model.Solve() // you should check for errors
 
-  fmt.Printf("solution optimal? %t", result.GetStatus() == golp.SolutionOptimal)
+  fmt.Printf("solution optimal? %t", result.GetStatus() == golpa.SolutionOptimal)
   fmt.Printf("z = %f\n", result.GetObjectiveValue())
   fmt.Printf("x1 = %f\n", result.GetValue(x1))
   ⋮

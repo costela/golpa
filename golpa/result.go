@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package golp
+package golpa
 
 // #cgo CFLAGS: -I/usr/include/lpsolve/
 // #cgo LDFLAGS: -llpsolve55 -lm -ldl -lcolamd
