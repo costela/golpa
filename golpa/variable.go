@@ -27,12 +27,12 @@ import (
 	"math"
 )
 
-type variable struct {
+type Variable struct {
 	model *Model
 	index int
 }
 
-type variableType int
+type VariableType int
 
 const (
 	ContinuousVariable = iota
@@ -42,11 +42,17 @@ const (
 
 /* variable-related functions (model variables, as opposed to Go variables) */
 
-func (v *variable) GetName() string {
+// GetName returns the name of a variable
+func (v *Variable) GetName() string {
 	return C.GoString(C.get_col_name(v.model.prob, C.int(v.index+1)))
 }
 
-func (v *variable) SetType(vartype variableType) {
+// SetType sets the type of a variable to either:
+// 
+// - ContinuousVariable
+// - Integervariable
+// - BinaryVariable
+func (v *Variable) SetType(vartype VariableType) {
 	switch vartype {
 	case ContinuousVariable:
 		C.set_int(v.model.prob, C.int(v.index+1), C.FALSE)
@@ -59,7 +65,8 @@ func (v *variable) SetType(vartype variableType) {
 	}
 }
 
-func (v *variable) GetType() variableType {
+// GetType returns this variable's type
+func (v *Variable) GetType() VariableType {
 	if C.is_binary(v.model.prob, C.int(v.index+1)) == C.TRUE {
 		return BinaryVariable
 	} else if C.is_int(v.model.prob, C.int(v.index+1)) == C.TRUE {
@@ -74,7 +81,7 @@ func (v *variable) GetType() variableType {
 // signal of the infinity is ignored, as the lower and upper bounds are
 // always assumed to be the negative and positive infinities,
 // respectively.
-func (v *variable) SetBounds(lower, upper float64) {
+func (v *Variable) SetBounds(lower, upper float64) {
 	switch {
 	case math.IsInf(lower, 0) && math.IsInf(upper, 0):
 		C.set_unbounded(v.model.prob, C.int(v.index+1))
@@ -89,7 +96,8 @@ func (v *variable) SetBounds(lower, upper float64) {
 	}
 }
 
-func (v *variable) GetBounds() (lower, upper float64) {
+// GetBounds returns the bounds currently set for this variable.
+func (v *Variable) GetBounds() (lower, upper float64) {
 	lower = float64(C.get_lowbo(v.model.prob, C.int(v.index+1)))
 	upper = float64(C.get_upbo(v.model.prob, C.int(v.index+1)))
 
@@ -104,10 +112,14 @@ func (v *variable) GetBounds() (lower, upper float64) {
 	return
 }
 
-func (v *variable) SetObjectiveCoefficient(coef float64) {
+// SetObjectiveCoefficient sets the coefficient for this variable in
+// the objective function.
+func (v *Variable) SetObjectiveCoefficient(coef float64) {
 	C.set_mat(v.model.prob, C.int(0), C.int(v.index+1), C.REAL(coef))
 }
 
-func (v *variable) GetCoefficient() float64 {
+// GetCoefficient returns this variable's coefficient in the objective
+// function.
+func (v *Variable) GetCoefficient() float64 {
 	return float64(C.get_mat(v.model.prob, C.int(0), C.int(v.index+1)))
 }

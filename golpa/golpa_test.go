@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package golpa
 
 import (
+    "fmt"
 	"math"
 	"runtime"
+    "sync"
 	"strconv"
 	"testing"
 	"time"
@@ -78,7 +80,7 @@ func TestSetObjectiveFunction(t *testing.T) {
 	v3, _ := model.AddVariable("y")
     v3.SetType(BinaryVariable)
 
-    vars := []*variable{v1, v2, v3}
+    vars := []*Variable{v1, v2, v3}
     coefs := []float64{1.3, 2.7182, 3.1416}
     model.SetObjectiveFunction(coefs, vars)
     for i, coef := range coefs {
@@ -95,9 +97,9 @@ func TestSolveMIP(t *testing.T) {
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, 3, 0, math.Inf(1))
 	x4, _ := model.AddDefinedVariable("x3", IntegerVariable, 1, 2, 3)
 
-	model.AddConstraint(0, 20, []*variable{x1, x2, x3, x4}, []float64{-1, 1, 1, 10})
-	model.AddConstraint(0, 30, []*variable{x1, x2, x3}, []float64{1, -3, 1})
-	model.AddConstraint(0, 0, []*variable{x2, x4}, []float64{1, -3.5})
+	model.AddConstraint(0, 20, []*Variable{x1, x2, x3, x4}, []float64{-1, 1, 1, 10})
+	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{1, -3, 1})
+	model.AddConstraint(0, 0, []*Variable{x2, x4}, []float64{1, -3.5})
 
 	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
@@ -113,7 +115,7 @@ func TestSolveMIP(t *testing.T) {
 		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
 			t.Errorf("objective function value did not match expectation: %v != %v", res.GetObjectiveValue(), expected_obj)
 		}
-		for i, x := range []*variable{x1, x2, x3, x4} {
+		for i, x := range []*Variable{x1, x2, x3, x4} {
 			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}
@@ -127,9 +129,9 @@ func TestSolveLP(t *testing.T) {
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, -1, 0, math.Inf(1))
 
-	model.AddConstraint(0, 14, []*variable{x1, x2, x3}, []float64{2, 1, 1})
-	model.AddConstraint(0, 28, []*variable{x1, x2, x3}, []float64{4, 2, 3})
-	model.AddConstraint(0, 30, []*variable{x1, x2, x3}, []float64{2, 5, 5})
+	model.AddConstraint(0, 14, []*Variable{x1, x2, x3}, []float64{2, 1, 1})
+	model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 3})
+	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{2, 5, 5})
 
 	if res, err := model.Solve(); err != nil {
 		t.Fatalf("model solving failed: %s", err)
@@ -145,7 +147,7 @@ func TestSolveLP(t *testing.T) {
 		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
 			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
 		}
-		for i, x := range []*variable{x1, x2, x3} {
+		for i, x := range []*Variable{x1, x2, x3} {
 			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
 				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
 			}
@@ -153,8 +155,54 @@ func TestSolveLP(t *testing.T) {
 	}
 }
 
+func TestBig(t *testing.T) {
+    if testing.Short() {
+        t.Skip("skipping test in short mode.")
+    }
+    num_vars := 100000
+    model := NewModel("test", Maximize)
+    vars  := make([]*Variable, num_vars)
+    coefs := make([]float64, num_vars)
+    for i := 0; i < num_vars; i++ {
+        v, _ := model.AddDefinedVariable(fmt.Sprintf("x%d", i), ContinuousVariable, 1, 0, math.Inf(1))
+        vars[i] = v
+        coefs[i] = 1
+        model.AddConstraint(0, float64(i), []*Variable{v}, []float64{1})
+    }
+    model.AddConstraint(-100, 100, vars, coefs)
+    res, err := model.Solve()
+    if err != nil {
+        t.Fatal("error solving model: %s", err)
+    }
+    if val := res.GetObjectiveValue(); val != 100 {
+        t.Fatal("model did not maximize to 100")
+    }
+}
+
+// Try to detect non-reentrant code in underlying lib
+func TestParallel(t *testing.T) {
+    runtime.GOMAXPROCS(runtime.NumCPU())
+    wg := sync.WaitGroup{}
+    wg.Add(2)
+    go func() {
+        defer wg.Done()
+        TestBig(t)
+    }()
+    go func() {
+        defer wg.Done()
+        TestBig(t)
+    }()
+    wg.Wait()
+}
+
+
 /* Benchmarks */
 
+
+/*
+ * BenchmarkMemoryLeaks is a hack to check if the GC really gets rid of
+ * unreferenced model values.
+ */
 func BenchmarkMemoryLeaks(b *testing.B) {
 	if testing.Short() {
 		b.SkipNow()

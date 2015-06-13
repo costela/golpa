@@ -1,7 +1,3 @@
-# General
-
-- documentation
-
 # API
 
 - provide interface to resize\_lp

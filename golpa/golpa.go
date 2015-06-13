@@ -33,7 +33,7 @@ import (
 
 type Model struct {
 	prob *C.lprec
-	vars []*variable
+	vars []*Variable
 }
 
 type direction C.uchar
@@ -45,6 +45,9 @@ const (
 
 /* Model related functions */
 
+// NewModel instantiates a new linear programming model, providing a
+// name (purely informational) and a optimization direction (either
+// Minimize or Maximize)
 func NewModel(name string, dir direction) *Model {
 	prob := C.make_lp(0, 0)
 	c_name := C.CString(name)
@@ -63,26 +66,23 @@ func NewModel(name string, dir direction) *Model {
 	return model
 }
 
+// finalizeModel is the function registered to be called upon garbage-
+// collection of the model value
 func finalizeModel(model *Model) {
 	C.delete_lp(model.prob)
 }
 
-func NewMaximizeModel(name string) *Model {
-	return NewModel(name, Maximize)
-}
-
-func NewMinimizeModel(name string) *Model {
-	return NewModel(name, Minimize)
-}
-
+// GetName returns the name provided upon instantiation of a model
 func (model *Model) GetName() string {
 	return C.GoString(C.get_lp_name(model.prob))
 }
 
+// SetDirection changes the direction of the model's optimization
 func (model Model) SetDirection(dir direction) {
 	C.set_sense(model.prob, C.uchar(dir))
 }
 
+// GetDirection returns the model's current optimization direction
 func (model *Model) GetDirection() direction {
 	if C.is_maxim(model.prob) == C.TRUE {
 		return Maximize
@@ -97,7 +97,7 @@ func (model *Model) GetVariableCount() int {
 	return int(C.get_Ncolumns(model.prob))
 }
 
-func (model *Model) GetVariables() []*variable {
+func (model *Model) GetVariables() []*Variable {
 	return model.vars
 }
 
@@ -109,29 +109,29 @@ func (model *Model) GetVariables() []*variable {
 // A variable is bound to its model. Attempting to use a variable
 // created in one model for fetching solutions from a different model
 // results in undefined behaviour.
-func (model *Model) AddVariable(name string) (v *variable, err error) {
+func (model *Model) AddVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, ContinuousVariable, 1, math.Inf(-1), math.Inf(1))
 }
 
 // AddBinaryVariable is a convenience function for adding a single
 // named binary variable to the model, with a default coefficient of 1.
-func (model *Model) AddBinaryVariable(name string) (v *variable, err error) {
+func (model *Model) AddBinaryVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, BinaryVariable, 1, 0, 1)
 }
 
 // AddIntegerVariable is a convenience function for adding a single
 // named unbounded integer variable to the model, with a default
 // objective coefficient of 1.
-func (model *Model) AddIntegerVariable(name string) (v *variable, err error) {
+func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, IntegerVariable, 1, math.Inf(-1), math.Inf(1))
 }
 
 // AddDefinedVariable add a variable to the linear programming model
 // with its attributes passed as arguments.
 // If varType is BinaryVariable, the bounds are ignored.
-func (model *Model) AddDefinedVariable(name string, varType variableType, coefficient, lowerBound, upperBound float64) (v *variable, err error) {
+func (model *Model) AddDefinedVariable(name string, varType VariableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
 	size := model.GetVariableCount()
-	v = new(variable)
+	v = new(Variable)
 	v.index = size
 	v.model = model
 	model.vars = append(model.vars, v)
@@ -155,7 +155,13 @@ func (model *Model) AddDefinedVariable(name string, varType variableType, coeffi
 	return
 }
 
-func (model *Model) SetObjectiveFunction(coefs []float64, vars []*variable) error {
+// SetObjectiveFunction defines the objective function for the model as
+// a slice of coefficients and a slice of its respective variables.
+// E.g.: an objective function of the form 2x+3y is passed as:
+//   SetObjectiveFunction([]float64{2,3}, []*Variable{x, y})
+// Where x and y are the return values of one of the Add*Variable
+// functions.
+func (model *Model) SetObjectiveFunction(coefs []float64, vars []*Variable) error {
     for i, v := range vars {
         v.SetObjectiveCoefficient(coefs[i])
     }
@@ -164,11 +170,16 @@ func (model *Model) SetObjectiveFunction(coefs []float64, vars []*variable) erro
 
 /* Constraint-related functions */
 
+// GetConstraintCount returns the number of individual constraints in
+// the model
 func (model *Model) GetConstraintCount() int {
 	return int(C.get_Nrows(model.prob))
 }
 
-func (model *Model) AddConstraint(lower, upper float64, vars []*variable, coefs []float64) error {
+// AddConstraint adds a constraint to the model as a lower and an upper
+// bounds, a slice of variables and a slice of their respective
+// coefficients.
+func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs []float64) error {
 	if len(vars) != len(coefs) {
 		return fmt.Errorf("inconsistent number of variables and coefficients: %d != %d", len(vars), len(coefs))
 	}
@@ -198,20 +209,22 @@ func (model *Model) AddConstraint(lower, upper float64, vars []*variable, coefs 
 }
 
 // Solve attempts to find an optimal solution to the model.
-func (model *Model) Solve() (res *solveResult, err error) {
-	res = new(solveResult)
+// Information about the solution can be queried from the returned
+// SolveResult value.
+func (model *Model) Solve() (res *SolveResult, err error) {
+	res = new(SolveResult)
 	res.model = model
 
 	ret := C.solve(model.prob)
 
 	switch ret {
 	case C.OPTIMAL, C.SUBOPTIMAL:
-		res.status = solveStatus(ret)
+		res.status = SolveStatus(ret)
 		return res, nil
 	case C.INFEASIBLE, C.UNBOUNDED, C.DEGENERATE, C.NUMFAILURE,
 		C.USERABORT, C.TIMEOUT, C.PROCFAIL, C.PROCBREAK, C.FEASFOUND,
 		C.NOFEASFOUND, C.NOMEMORY:
-		return nil, solveError(ret)
+		return nil, SolveError(ret)
 	default:
 		panic("unrecognized result")
 	}

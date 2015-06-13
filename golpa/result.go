@@ -25,36 +25,37 @@ import "C"
 
 /* Types */
 
-type solveResult struct {
+type SolveResult struct {
 	model  *Model
-	status solveStatus
+	status SolveStatus
 }
 
-type solveStatus C.int
+type SolveStatus C.int
 
 const (
-	SolutionOptimal    = solveStatus(C.OPTIMAL)
-	SolutionSuboptimal = solveStatus(C.SUBOPTIMAL)
+	SolutionOptimal    = SolveStatus(C.OPTIMAL)
+	SolutionSuboptimal = SolveStatus(C.SUBOPTIMAL)
 )
 
-type solveError C.int
+type SolveError C.int
 
 const (
-	ErrorModelInfeasible  = solveError(C.INFEASIBLE)
-	ErrorModelUnbounded   = solveError(C.UNBOUNDED)
-	ErrorModelDegenerate  = solveError(C.DEGENERATE)
-	ErrorNumericalFailure = solveError(C.NUMFAILURE)
-	ErrorUserAbort        = solveError(C.USERABORT) // we don't use C.put_abortfunc
-	ErrorTimeout          = solveError(C.TIMEOUT)   // FIXME: support C.set_timeout
-	//ErrorPresolved        = solveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
-	ErrorBranchCutFail   = solveError(C.PROCFAIL)
-	ErrorBranchCutBreak  = solveError(C.PROCBREAK) // we don't use set_break_at_first/set_break_at_value
-	ErrorFeasibleFound   = solveError(C.FEASFOUND)
-	ErrorNoFeasibleFound = solveError(C.NOFEASFOUND)
-	ErrorNoMemory        = solveError(C.NOMEMORY)
+	ErrorModelInfeasible  = SolveError(C.INFEASIBLE)
+	ErrorModelUnbounded   = SolveError(C.UNBOUNDED)
+	ErrorModelDegenerate  = SolveError(C.DEGENERATE)
+	ErrorNumericalFailure = SolveError(C.NUMFAILURE)
+	ErrorUserAbort        = SolveError(C.USERABORT) // we don't use C.put_abortfunc
+	ErrorTimeout          = SolveError(C.TIMEOUT)   // FIXME: support C.set_timeout
+	//ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
+	ErrorBranchCutFail    = SolveError(C.PROCFAIL)
+	ErrorBranchCutBreak   = SolveError(C.PROCBREAK) // we don't use set_break_at_first/set_break_at_value
+	ErrorFeasibleFound    = SolveError(C.FEASFOUND)
+	ErrorNoFeasibleFound  = SolveError(C.NOFEASFOUND)
+	ErrorNoMemory         = SolveError(C.NOMEMORY)
 )
 
-func (e solveError) Error() string {
+// Error returns a string representation of the given error value.
+func (e SolveError) Error() string {
 	switch e {
 	case ErrorModelInfeasible:
 		return "model is infeasible"
@@ -86,24 +87,34 @@ func (e solveError) Error() string {
 
 // GetStatus reports if the solution is optimal (SolutionOptimal) or
 // not (SolutionSuboptimal)
-func (res solveResult) GetStatus() solveStatus {
+func (res SolveResult) GetStatus() SolveStatus {
 	return res.status
 }
 
-func (res solveResult) GetValue(v *variable) float64 {
+// GetValue returns the computed value of the given variable for this
+// optimization result.
+// This is a shorthand for GetPrimalValue.
+func (res SolveResult) GetValue(v *Variable) float64 {
 	return res.GetPrimalValue(v)
 }
 
-func (res solveResult) GetPrimalValue(v *variable) float64 {
+// GetPrimalValue returns the computed value of the given variable for
+// this optimization result.
+func (res SolveResult) GetPrimalValue(v *Variable) float64 {
 	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
 	return float64(C.get_var_primalresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
 }
 
-func (res solveResult) GetDualValue(v *variable) float64 {
+// GetDualValue returns the dual value of the given variable in this
+// optimization result.
+func (res SolveResult) GetDualValue(v *Variable) float64 {
 	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
 	return float64(C.get_var_dualresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
 }
 
-func (res solveResult) GetObjectiveValue() float64 {
+// GetObjectiveValue returns the value of the objective function for
+// this optimization result. This value is only optimal if GetStatus
+// also returns SolutionOptimal.
+func (res SolveResult) GetObjectiveValue() float64 {
 	return float64(C.get_objective(res.model.prob))
 }
