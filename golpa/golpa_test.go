@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package golpa
 
 import (
-    "fmt"
+	"fmt"
 	"math"
 	"runtime"
-    "sync"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -73,21 +73,21 @@ func TestAddVariableWithDetails(t *testing.T) {
 }
 
 func TestSetObjectiveFunction(t *testing.T) {
-    model := NewModel("test", Maximize)
+	model := NewModel("test", Maximize)
 	v1, _ := model.AddVariable("x")
 	v2, _ := model.AddVariable("y")
-    v2.SetType(IntegerVariable)
+	v2.SetType(IntegerVariable)
 	v3, _ := model.AddVariable("y")
-    v3.SetType(BinaryVariable)
+	v3.SetType(BinaryVariable)
 
-    vars := []*Variable{v1, v2, v3}
-    coefs := []float64{1.3, 2.7182, 3.1416}
-    model.SetObjectiveFunction(coefs, vars)
-    for i, coef := range coefs {
-        if vars[i].GetCoefficient() != coef {
-            t.Fatalf("%s coefficient not set correctly while defining objective function", v1)
-        }
-    }
+	vars := []*Variable{v1, v2, v3}
+	coefs := []float64{1.3, 2.7182, 3.1416}
+	model.SetObjectiveFunction(coefs, vars)
+	for i, coef := range coefs {
+		if vars[i].GetCoefficient() != coef {
+			t.Fatalf("%s coefficient not set correctly while defining objective function", v1)
+		}
+	}
 }
 
 func TestSolveMIP(t *testing.T) {
@@ -156,48 +156,46 @@ func TestSolveLP(t *testing.T) {
 }
 
 func TestBig(t *testing.T) {
-    if testing.Short() {
-        t.Skip("skipping test in short mode.")
-    }
-    num_vars := 100000
-    model := NewModel("test", Maximize)
-    vars  := make([]*Variable, num_vars)
-    coefs := make([]float64, num_vars)
-    for i := 0; i < num_vars; i++ {
-        v, _ := model.AddDefinedVariable(fmt.Sprintf("x%d", i), ContinuousVariable, 1, 0, math.Inf(1))
-        vars[i] = v
-        coefs[i] = 1
-        model.AddConstraint(0, float64(i), []*Variable{v}, []float64{1})
-    }
-    model.AddConstraint(-100, 100, vars, coefs)
-    res, err := model.Solve()
-    if err != nil {
-        t.Fatal("error solving model: %s", err)
-    }
-    if val := res.GetObjectiveValue(); val != 100 {
-        t.Fatal("model did not maximize to 100")
-    }
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	num_vars := 100000
+	model := NewModel("test", Maximize)
+	vars := make([]*Variable, num_vars)
+	coefs := make([]float64, num_vars)
+	for i := 0; i < num_vars; i++ {
+		v, _ := model.AddDefinedVariable(fmt.Sprintf("x%d", i), ContinuousVariable, 1, 0, math.Inf(1))
+		vars[i] = v
+		coefs[i] = 1
+		model.AddConstraint(0, float64(i), []*Variable{v}, []float64{1})
+	}
+	model.AddConstraint(-100, 100, vars, coefs)
+	res, err := model.Solve()
+	if err != nil {
+		t.Fatal("error solving model: %s", err)
+	}
+	if val := res.GetObjectiveValue(); val != 100 {
+		t.Fatal("model did not maximize to 100")
+	}
 }
 
 // Try to detect non-reentrant code in underlying lib
 func TestParallel(t *testing.T) {
-    runtime.GOMAXPROCS(runtime.NumCPU())
-    wg := sync.WaitGroup{}
-    wg.Add(2)
-    go func() {
-        defer wg.Done()
-        TestBig(t)
-    }()
-    go func() {
-        defer wg.Done()
-        TestBig(t)
-    }()
-    wg.Wait()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		TestBig(t)
+	}()
+	go func() {
+		defer wg.Done()
+		TestBig(t)
+	}()
+	wg.Wait()
 }
 
-
 /* Benchmarks */
-
 
 /*
  * BenchmarkMemoryLeaks is a hack to check if the GC really gets rid of

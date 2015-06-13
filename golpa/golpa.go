@@ -15,6 +15,58 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+
+GoLPA is a library for moddeling and solving linear programming problems.
+
+As an example of the API, the model of the following problem:
+
+    Maximize:
+      z = x1 + 2 x2 - 3 x3
+    With:
+      0 <= x1 <= 40
+      5 <= x3 <= 11
+    Subject to:
+      0 <= - x1 + x2 + 5.3 x3 <= 10
+      -inf <= 2 x1 - 5 x2 + 3 x3 <= 20
+      x2 - 8 x3 = 0
+
+can be expressed with GoLPA like this:
+
+    package main
+
+    import (
+        "github.com/costela/golpa/golpa"
+        "math"
+        "fmt"
+    )
+
+    func main() {
+      model := golpa.NewModel("some model", golpa.Maximize)
+      x1, _ := model.AddVariable("x1")
+      x1.SetBounds(0, 40)
+      x2, _ := model.AddVariable("x2")
+      x2.SetObjectiveCoefficient(2)
+      // alternatively, all information pertaining can be given at once:
+      x3, _ := model.AddDefinedVariable("x3", golpa.ContinuousVariable, 3, 5, 11)
+
+      model.AddConstraint(0, 10, []*golpa.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
+      model.AddConstraint(math.Inf(-1), 20, []*golpa.Variable{x1, x2, x3}, []float64{2, -5, 3})
+      model.AddConstraint(0, 0, []*golpa.Variable{x1, x3}, []float64{1, -8})
+      ⋮
+
+The model can than be solved and the resulting values can than be retrieved as follows:
+
+      ⋮
+      result, _ := model.Solve() // you should check for errors
+
+      fmt.Printf("solution optimal? %t", result.GetStatus() == golpa.SolutionOptimal)
+      fmt.Printf("z = %f\n", result.GetObjectiveValue())
+      fmt.Printf("x1 = %f\n", result.GetValue(x1))
+      ⋮
+    }
+
+*/
 package golpa
 
 // #cgo CFLAGS: -I/usr/include/lpsolve/
@@ -162,10 +214,10 @@ func (model *Model) AddDefinedVariable(name string, varType VariableType, coeffi
 // Where x and y are the return values of one of the Add*Variable
 // functions.
 func (model *Model) SetObjectiveFunction(coefs []float64, vars []*Variable) error {
-    for i, v := range vars {
-        v.SetObjectiveCoefficient(coefs[i])
-    }
-    return nil
+	for i, v := range vars {
+		v.SetObjectiveCoefficient(coefs[i])
+	}
+	return nil
 }
 
 /* Constraint-related functions */

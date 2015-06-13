@@ -44,14 +44,14 @@ const (
 	ErrorModelUnbounded   = SolveError(C.UNBOUNDED)
 	ErrorModelDegenerate  = SolveError(C.DEGENERATE)
 	ErrorNumericalFailure = SolveError(C.NUMFAILURE)
-	ErrorUserAbort        = SolveError(C.USERABORT) // we don't use C.put_abortfunc
-	ErrorTimeout          = SolveError(C.TIMEOUT)   // FIXME: support C.set_timeout
-	//ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
 	ErrorBranchCutFail    = SolveError(C.PROCFAIL)
-	ErrorBranchCutBreak   = SolveError(C.PROCBREAK) // we don't use set_break_at_first/set_break_at_value
 	ErrorFeasibleFound    = SolveError(C.FEASFOUND)
 	ErrorNoFeasibleFound  = SolveError(C.NOFEASFOUND)
 	ErrorNoMemory         = SolveError(C.NOMEMORY)
+	ErrorBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
+	ErrorUserAbort        = SolveError(C.USERABORT) // should not be seen: we don't use C.put_abortfunc
+	ErrorTimeout          = SolveError(C.TIMEOUT)   // should not be seen: we don't support C.set_timeout (yet!)
+	//ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
 )
 
 // Error returns a string representation of the given error value.

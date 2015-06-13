@@ -48,10 +48,9 @@ func (v *Variable) GetName() string {
 }
 
 // SetType sets the type of a variable to either:
-// 
-// - ContinuousVariable
-// - Integervariable
-// - BinaryVariable
+//    - ContinuousVariable
+//    - Integervariable
+//    - BinaryVariable
 func (v *Variable) SetType(vartype VariableType) {
 	switch vartype {
 	case ContinuousVariable:
