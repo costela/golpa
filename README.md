@@ -1,4 +1,6 @@
-# Go Linear Programming Abstraction [![Build Status](https://travis-ci.org/costela/golpa.svg)](https://travis-ci.org/costela/golpa)
+# Go Linear Programming Abstraction
+[![Build Status](https://travis-ci.org/costela/golpa.svg)](https://travis-ci.org/costela/golpa)
+[![GoDoc](https://godoc.org/github.com/costela/golpa/golpa?status.svg)](https://godoc.org/github.com/costela/golpa/golpa)
 
 GoLPA is a library for modeling and solving linear programming problems. It uses [lp\_solve](http://lpsolve.sourceforge.net) for the actual number crunching, but offers a slightly higher-level interface for problem modeling relative to the underlying library.
 Since the intention is providing a simpler interface, the underlying API is not completely exposed. If there are features of the low-level library you'd like to see exposed by GoLPA, please open an issue.
