@@ -85,7 +85,7 @@ func TestSetObjectiveFunction(t *testing.T) {
 	model.SetObjectiveFunction(coefs, vars)
 	for i, coef := range coefs {
 		if vars[i].GetCoefficient() != coef {
-			t.Fatalf("%s coefficient not set correctly while defining objective function", v1)
+			t.Fatalf("%v coefficient not set correctly while defining objective function", v1)
 		}
 	}
 }
@@ -172,7 +172,7 @@ func TestBig(t *testing.T) {
 	model.AddConstraint(-100, 100, vars, coefs)
 	res, err := model.Solve()
 	if err != nil {
-		t.Fatal("error solving model: %s", err)
+		t.Fatalf("error solving model: %s", err)
 	}
 	if val := res.GetObjectiveValue(); val != 100 {
 		t.Fatal("model did not maximize to 100")
