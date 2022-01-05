@@ -131,6 +131,27 @@ func finalizeModel(model *Model) {
 	C.delete_lp(model.prob)
 }
 
+// Clone returns a copy of the model.
+func (model *Model) Clone() *Model {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
+	newProb := C.copy_lp(model.prob)
+	newVars := make([]*Variable, len(model.vars))
+	newModel := &Model{
+		prob: newProb,
+	}
+
+	for i, v := range model.vars {
+		newVars[i] = &Variable{
+			model: newModel,
+			index: v.index,
+		}
+	}
+
+	return newModel
+}
+
 // Name returns the name provided upon instantiation of a model
 func (model *Model) Name() string {
 	model.mu.RLock()

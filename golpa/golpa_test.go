@@ -30,6 +30,34 @@ const (
 	epsilon = 0.0000001 // acceptable numerical deviation for test results
 )
 
+var (
+	bigModel     *Model
+	bigModelOnce sync.Once
+)
+
+func getBigModelCopy(t *testing.T) *Model {
+	t.Helper()
+
+	bigModelOnce.Do(func() {
+		num_vars := 10000
+		model := NewModel("test", Maximize)
+		vars := make([]*Variable, num_vars)
+		coefs := make([]float64, num_vars)
+		for i := 0; i < num_vars; i++ {
+			v, _ := model.AddIntegerVariable(fmt.Sprintf("x%d", i))
+			vars[i] = v
+			coefs[i] = 1
+			if err := model.AddConstraint(-float64(i), float64(i), []*Variable{v}, []float64{1}); err != nil {
+				t.Fatalf("could not add contraint: %v", err)
+			}
+		}
+
+		bigModel = model
+	})
+
+	return bigModel.Clone()
+}
+
 func TestInstantiation(t *testing.T) {
 	name := "test model 1"
 	model := NewModel(name, Maximize)
@@ -165,21 +193,17 @@ func TestBig(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	num_vars := 100000
-	model := NewModel("test", Maximize)
-	vars := make([]*Variable, num_vars)
-	coefs := make([]float64, num_vars)
-	for i := 0; i < num_vars; i++ {
-		v, _ := model.AddDefinedVariable(fmt.Sprintf("x%d", i), ContinuousVariable, 1, 0, math.Inf(1))
-		vars[i] = v
-		coefs[i] = 1
-		model.AddConstraint(0, float64(i), []*Variable{v}, []float64{1})
-	}
-	model.AddConstraint(-100, 100, vars, coefs)
+
+	model := getBigModelCopy(t)
+
 	res, err := model.Solve()
 	if err != nil {
-		t.Fatalf("error solving model: %s", err)
+		t.Fatalf("error solving model: %v", err)
 	}
+
+	expected := 49995000.0
+	if val := res.ObjectiveValue(); val != expected {
+		t.Fatalf("model did not maximize to expected value: %f != %f", val, expected)
 	if val := res.GetObjectiveValue(); val != 100 {
 		t.Fatal("model did not maximize to 100")
 	}
@@ -187,16 +211,21 @@ func TestBig(t *testing.T) {
 
 // Try to detect non-reentrant code in underlying lib
 func TestParallel(t *testing.T) {
-	runtime.GOMAXPROCS(2)
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	model := getBigModelCopy(t)
+
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		TestBig(t)
+		model.Solve()
 	}()
 	go func() {
 		defer wg.Done()
-		TestBig(t)
+		model.Solve()
 	}()
 	wg.Wait()
 }
