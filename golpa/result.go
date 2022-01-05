@@ -40,46 +40,50 @@ const (
 type SolveError C.int
 
 const (
-	ErrorModelInfeasible  = SolveError(C.INFEASIBLE)
-	ErrorModelUnbounded   = SolveError(C.UNBOUNDED)
-	ErrorModelDegenerate  = SolveError(C.DEGENERATE)
-	ErrorNumericalFailure = SolveError(C.NUMFAILURE)
-	ErrorBranchCutFail    = SolveError(C.PROCFAIL)
-	ErrorFeasibleFound    = SolveError(C.FEASFOUND)
-	ErrorNoFeasibleFound  = SolveError(C.NOFEASFOUND)
-	ErrorNoMemory         = SolveError(C.NOMEMORY)
-	ErrorBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
-	ErrorUserAbort        = SolveError(C.USERABORT) // should not be seen: we don't use C.put_abortfunc
-	ErrorTimeout          = SolveError(C.TIMEOUT)   // should not be seen: we don't support C.set_timeout (yet!)
-	// ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
+	ErrAccuracy         = SolveError(C.ACCURACYERROR)
+	ErrBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
+	ErrBranchCutFail    = SolveError(C.PROCFAIL)
+	ErrFeasibleFound    = SolveError(C.FEASFOUND)
+	ErrModelDegenerate  = SolveError(C.DEGENERATE)
+	ErrModelInfeasible  = SolveError(C.INFEASIBLE)
+	ErrModelUnbounded   = SolveError(C.UNBOUNDED)
+	ErrNoFeasibleFound  = SolveError(C.NOFEASFOUND)
+	ErrNoMemory         = SolveError(C.NOMEMORY)
+	ErrNumericalFailure = SolveError(C.NUMFAILURE)
+	ErrPresolved        = SolveError(C.PRESOLVED) // should not be seen: we can't use C.set_presolve because it might remove variables behind our backs
+	ErrTimeout          = SolveError(C.TIMEOUT)
+	ErrUserAbort        = SolveError(C.USERABORT) // should not be seen: we don't use C.put_abortfunc
 )
 
 // Error returns a string representation of the given error value.
 func (e SolveError) Error() string {
 	switch e {
-	case ErrorModelInfeasible:
-		return "model is infeasible"
-	case ErrorModelUnbounded:
-		return "model is unbounded"
-	case ErrorModelDegenerate:
-		return "model is degenerate"
-	case ErrorNumericalFailure:
-		return "numerical failure while solving"
-	case ErrorUserAbort:
-		return "aborted by user abort function "
-	case ErrorTimeout:
-		return "timeout occurred before any integer solution could be found"
-	// case ErrorPresolved:
-	case ErrorBranchCutFail:
-		return "branch-and-cut failure"
-	case ErrorBranchCutBreak:
+	case ErrAccuracy:
+		return "accuracy error encountered"
+	case ErrBranchCutBreak:
 		return "branch-and-cut stopped at beakpoint"
-	case ErrorFeasibleFound:
+	case ErrBranchCutFail:
+		return "branch-and-cut failure"
+	case ErrFeasibleFound:
 		return "feasible but non-integer solution found"
-	case ErrorNoFeasibleFound:
+	case ErrModelDegenerate:
+		return "model is degenerate"
+	case ErrModelInfeasible:
+		return "model is infeasible"
+	case ErrModelUnbounded:
+		return "model is unbounded"
+	case ErrNoFeasibleFound:
 		return "no feasible solution found"
-	case ErrorNoMemory:
+	case ErrNoMemory:
 		return "ran out of memory while solving"
+	case ErrNumericalFailure:
+		return "numerical failure while solving"
+	case ErrPresolved:
+		return "model was presolved"
+	case ErrTimeout:
+		return "timeout occurred before any integer solution could be found"
+	case ErrUserAbort:
+		return "aborted by user abort function "
 	default:
 		panic("unrecognized error")
 	}
