@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package golpa
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -204,8 +206,18 @@ func TestBig(t *testing.T) {
 	expected := 49995000.0
 	if val := res.ObjectiveValue(); val != expected {
 		t.Fatalf("model did not maximize to expected value: %f != %f", val, expected)
-	if val := res.GetObjectiveValue(); val != 100 {
-		t.Fatal("model did not maximize to 100")
+	}
+}
+
+func TestContext(t *testing.T) {
+	model := getBigModelCopy(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := model.SolveWithContext(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected timeout solving model, got: %v", err)
 	}
 }
 

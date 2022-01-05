@@ -73,9 +73,14 @@ package golpa
 // #cgo LDFLAGS: -llpsolve55 -lm -ldl -lcolamd
 // #include <lp_lib.h>
 // #include <stdlib.h>
+/*
+extern int abortCallback(lprec *lp, void *userhandle); // https://golang.org/issue/19837
+*/
 import "C"
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -339,4 +344,30 @@ func (model *Model) Solve() (res *SolveResult, err error) {
 	default:
 		panic("unrecognized result")
 	}
+}
+
+//export abortCallback
+func abortCallback(prob *C.lprec, ctxPtr unsafe.Pointer) C.int {
+	ctx := loadContext(ctxPtr)
+	if ctx.Err() != nil {
+		return C.TRUE
+	}
+
+	return C.FALSE
+}
+
+// SolveWithContext wraps Solve() with a context. If the context is cancelled or times out, the solution search will be
+// aborted and the context error will be returned.
+// Note that if some solution has already been found, res.Status() will be SolutionSuboptimal.
+func (model *Model) SolveWithContext(ctx context.Context) (res *SolveResult, err error) {
+	C.put_abortfunc(model.prob, (*C.lphandle_intfunc)(C.abortCallback), saveContext(ctx))
+	defer C.put_abortfunc(model.prob, nil, nil)
+
+	ret, err := model.Solve()
+
+	if errors.Is(err, ErrUserAbort) {
+		return ret, ctx.Err()
+	}
+
+	return ret, err
 }

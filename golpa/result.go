@@ -52,7 +52,7 @@ const (
 	ErrNumericalFailure = SolveError(C.NUMFAILURE)
 	ErrPresolved        = SolveError(C.PRESOLVED) // should not be seen: we can't use C.set_presolve because it might remove variables behind our backs
 	ErrTimeout          = SolveError(C.TIMEOUT)
-	ErrUserAbort        = SolveError(C.USERABORT) // should not be seen: we don't use C.put_abortfunc
+	ErrUserAbort        = SolveError(C.USERABORT)
 )
 
 // Error returns a string representation of the given error value.
