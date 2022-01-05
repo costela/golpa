@@ -332,7 +332,7 @@ func (model *Model) Solve() (res *SolveResult, err error) {
 	case C.OPTIMAL, C.SUBOPTIMAL:
 		res.status = SolveStatus(ret)
 		return res, nil
-	case C.INFEASIBLE, C.UNBOUNDED, C.DEGENERATE, C.NUMFAILURE,
+	case C.ACCURACYERROR, C.INFEASIBLE, C.UNBOUNDED, C.DEGENERATE, C.NUMFAILURE,
 		C.USERABORT, C.TIMEOUT, C.PROCFAIL, C.PROCBREAK, C.FEASFOUND,
 		C.NOFEASFOUND, C.NOMEMORY:
 		return nil, SolveError(ret)
