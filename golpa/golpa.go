@@ -79,12 +79,14 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
 /* Types */
 
 type Model struct {
+	mu   sync.RWMutex
 	prob *C.lprec
 	vars []*Variable
 }
@@ -103,12 +105,16 @@ const (
 // Minimize or Maximize)
 func NewModel(name string, dir direction) *Model {
 	prob := C.make_lp(0, 0)
+
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))
+
 	C.set_lp_name(prob, c_name)
 	C.set_sense(prob, C.uchar(dir))
 
-	model := &Model{prob: prob}
+	model := &Model{
+		prob: prob,
+	}
 
 	C.set_verbose(prob, C.FALSE) // FIXME: use put_logfunc to *really* silence the lib
 
@@ -125,18 +131,27 @@ func finalizeModel(model *Model) {
 	C.delete_lp(model.prob)
 }
 
-// GetName returns the name provided upon instantiation of a model
-func (model *Model) GetName() string {
+// Name returns the name provided upon instantiation of a model
+func (model *Model) Name() string {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
 	return C.GoString(C.get_lp_name(model.prob))
 }
 
 // SetDirection changes the direction of the model's optimization
-func (model Model) SetDirection(dir direction) {
+func (model *Model) SetDirection(dir direction) {
+	model.mu.Lock()
+	defer model.mu.Unlock()
+
 	C.set_sense(model.prob, C.uchar(dir))
 }
 
 // GetDirection returns the model's current optimization direction
-func (model *Model) GetDirection() direction {
+func (model *Model) Direction() direction {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
 	if C.is_maxim(model.prob) == C.TRUE {
 		return Maximize
 	} else {
@@ -146,11 +161,19 @@ func (model *Model) GetDirection() direction {
 
 /* Column-related functions */
 
-func (model *Model) GetVariableCount() int {
+func (model *Model) VariableCount() int {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
 	return int(C.get_Ncolumns(model.prob))
 }
 
-func (model *Model) GetVariables() []*Variable {
+// Variables returns a new slice with the model's variables. Changes to the slice will not be reflected in the model.
+// Changes to the variables
+func (model *Model) Variables() []*Variable {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
 	return model.vars
 }
 
@@ -183,22 +206,30 @@ func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 // with its attributes passed as arguments.
 // If varType is BinaryVariable, the bounds are ignored.
 func (model *Model) AddDefinedVariable(name string, varType VariableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
-	size := model.GetVariableCount()
-	v = new(Variable)
-	v.index = size
-	v.model = model
-	model.vars = append(model.vars, v)
+	size := model.VariableCount()
 
-	// when adding a variable after some constraints have been defined,
-	// we pass an array filled with zeroes to add_column, so the new
-	// variable is assumed to not be used in the existing constraints
-	C.add_columnex(model.prob, 0, nil, nil)
-	// coef_array := make([]C.REAL, model.GetConstraintCount()+1)
-	// C.add_column(model.prob, &coef_array[0])
+	func() {
+		model.mu.Lock()
+		defer model.mu.Unlock()
 
-	c_name := C.CString(name)
-	defer C.free(unsafe.Pointer(c_name))
-	C.set_col_name(model.prob, C.int(v.index+1), c_name)
+		v = new(Variable)
+		v.index = size
+		v.model = model
+		model.vars = append(model.vars, v)
+
+		// when adding a variable after some constraints have been defined,
+		// we pass an array filled with zeroes to add_column, so the new
+		// variable is assumed to not be used in the existing constraints
+		C.add_columnex(model.prob, 0, nil, nil)
+		// coef_array := make([]C.REAL, model.ConstraintCount()+1)
+		// C.add_column(model.prob, &coef_array[0])
+
+		c_name := C.CString(name)
+		defer C.free(unsafe.Pointer(c_name))
+
+		C.set_col_name(model.prob, C.int(v.index+1), c_name)
+	}()
+
 	v.SetType(varType)
 	v.SetObjectiveCoefficient(coefficient)
 	if varType != BinaryVariable {
@@ -223,9 +254,12 @@ func (model *Model) SetObjectiveFunction(coefs []float64, vars []*Variable) erro
 
 /* Constraint-related functions */
 
-// GetConstraintCount returns the number of individual constraints in
+// ConstraintCount returns the number of individual constraints in
 // the model
-func (model *Model) GetConstraintCount() int {
+func (model *Model) ConstraintCount() int {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
 	return int(C.get_Nrows(model.prob))
 }
 
@@ -265,6 +299,9 @@ func (model *Model) AddConstraint(lower, upper float64, vars []*Variable, coefs 
 // Information about the solution can be queried from the returned
 // SolveResult value.
 func (model *Model) Solve() (res *SolveResult, err error) {
+	model.mu.Lock()
+	defer model.mu.Unlock()
+
 	res = new(SolveResult)
 	res.model = model
 

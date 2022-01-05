@@ -42,8 +42,11 @@ const (
 
 /* variable-related functions (model variables, as opposed to Go variables) */
 
-// GetName returns the name of a variable
-func (v *Variable) GetName() string {
+// Name returns the name of a variable
+func (v *Variable) Name() string {
+	v.model.mu.RLock()
+	defer v.model.mu.RUnlock()
+
 	return C.GoString(C.get_col_name(v.model.prob, C.int(v.index+1)))
 }
 
@@ -52,6 +55,9 @@ func (v *Variable) GetName() string {
 //    - Integervariable
 //    - BinaryVariable
 func (v *Variable) SetType(vartype VariableType) {
+	v.model.mu.Lock()
+	defer v.model.mu.Unlock()
+
 	switch vartype {
 	case ContinuousVariable:
 		C.set_int(v.model.prob, C.int(v.index+1), C.FALSE)
@@ -64,8 +70,11 @@ func (v *Variable) SetType(vartype VariableType) {
 	}
 }
 
-// GetType returns this variable's type
-func (v *Variable) GetType() VariableType {
+// Type returns this variable's type
+func (v *Variable) Type() VariableType {
+	v.model.mu.RLock()
+	defer v.model.mu.RUnlock()
+
 	if C.is_binary(v.model.prob, C.int(v.index+1)) == C.TRUE {
 		return BinaryVariable
 	} else if C.is_int(v.model.prob, C.int(v.index+1)) == C.TRUE {
@@ -81,6 +90,9 @@ func (v *Variable) GetType() VariableType {
 // always assumed to be the negative and positive infinities,
 // respectively.
 func (v *Variable) SetBounds(lower, upper float64) {
+	v.model.mu.Lock()
+	defer v.model.mu.Unlock()
+
 	switch {
 	case math.IsInf(lower, 0) && math.IsInf(upper, 0):
 		C.set_unbounded(v.model.prob, C.int(v.index+1))
@@ -95,8 +107,11 @@ func (v *Variable) SetBounds(lower, upper float64) {
 	}
 }
 
-// GetBounds returns the bounds currently set for this variable.
-func (v *Variable) GetBounds() (lower, upper float64) {
+// Bounds returns the bounds currently set for this variable.
+func (v *Variable) Bounds() (lower, upper float64) {
+	v.model.mu.RLock()
+	defer v.model.mu.RUnlock()
+
 	lower = float64(C.get_lowbo(v.model.prob, C.int(v.index+1)))
 	upper = float64(C.get_upbo(v.model.prob, C.int(v.index+1)))
 
@@ -114,11 +129,17 @@ func (v *Variable) GetBounds() (lower, upper float64) {
 // SetObjectiveCoefficient sets the coefficient for this variable in
 // the objective function.
 func (v *Variable) SetObjectiveCoefficient(coef float64) {
+	v.model.mu.Lock()
+	defer v.model.mu.Unlock()
+
 	C.set_mat(v.model.prob, C.int(0), C.int(v.index+1), C.REAL(coef))
 }
 
-// GetCoefficient returns this variable's coefficient in the objective
+// Coefficient returns this variable's coefficient in the objective
 // function.
-func (v *Variable) GetCoefficient() float64 {
+func (v *Variable) Coefficient() float64 {
+	v.model.mu.RLock()
+	defer v.model.mu.RUnlock()
+
 	return float64(C.get_mat(v.model.prob, C.int(0), C.int(v.index+1)))
 }

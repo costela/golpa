@@ -33,41 +33,47 @@ const (
 func TestInstantiation(t *testing.T) {
 	name := "test model 1"
 	model := NewModel(name, Maximize)
-	if model.GetName() != name {
+	if model.Name() != name {
 		t.Fatal("model name did not survive instantiation")
 	}
-	if model.GetDirection() != Maximize {
+	if model.Direction() != Maximize {
 		t.Fatal("optimization direction did not survive instantiation")
 	}
 }
 
 func TestAddVariableWithDetails(t *testing.T) {
 	model := NewModel("test", Maximize)
-	v1, _ := model.AddDefinedVariable("x", BinaryVariable, 3.1416, 0, 1)
-	if v1.GetName() != "x" {
+	v1, err := model.AddDefinedVariable("x", BinaryVariable, 3.1416, 0, 1)
+	if err != nil {
+		t.Fatalf("could not add defined variable: %s", err)
+	}
+	if v1.Name() != "x" {
 		t.Fatal("variable name did not survive instantiation")
 	}
-	if v1.GetType() != BinaryVariable {
+	if v1.Type() != BinaryVariable {
 		t.Fatal("variable type did not survive instantiation")
 	}
-	if v1.GetCoefficient() != 3.1416 {
+	if v1.Coefficient() != 3.1416 {
 		t.Fatal("variable coefficient did not survive instantiation")
 	}
-	if l, h := v1.GetBounds(); l != 0 || h != 1 {
+	if l, h := v1.Bounds(); l != 0 || h != 1 {
 		t.Fatal("variable bounds did not survive instantiation")
 	}
 
-	v2, _ := model.AddDefinedVariable("y", ContinuousVariable, -1, math.Inf(-1), 5)
-	if v2.GetName() != "y" {
+	v2, err := model.AddDefinedVariable("y", ContinuousVariable, -1, math.Inf(-1), 5)
+	if err != nil {
+		t.Fatalf("could not add defined variable: %s", err)
+	}
+	if v2.Name() != "y" {
 		t.Fatal("variable name did not survive instantiation")
 	}
-	if v2.GetType() != ContinuousVariable {
+	if v2.Type() != ContinuousVariable {
 		t.Fatal("variable type did not survive instantiation")
 	}
-	if v2.GetCoefficient() != -1 {
+	if v2.Coefficient() != -1 {
 		t.Fatal("variable coefficient did not survive instantiation")
 	}
-	if l, h := v2.GetBounds(); l != math.Inf(-1) || h != 5 {
+	if l, h := v2.Bounds(); l != math.Inf(-1) || h != 5 {
 		t.Fatal("variable bounds did not survive instantiation")
 	}
 }
@@ -84,7 +90,7 @@ func TestSetObjectiveFunction(t *testing.T) {
 	coefs := []float64{1.3, 2.7182, 3.1416}
 	model.SetObjectiveFunction(coefs, vars)
 	for i, coef := range coefs {
-		if vars[i].GetCoefficient() != coef {
+		if vars[i].Coefficient() != coef {
 			t.Fatalf("%v coefficient not set correctly while defining objective function", v1)
 		}
 	}
@@ -107,17 +113,17 @@ func TestSolveMIP(t *testing.T) {
 		expected_xs := []float64{40, 10.5, 19.5, 3}
 		expected_obj := 122.5
 
-		if res.GetStatus() != SolutionOptimal {
+		if res.Status() != SolutionOptimal {
 			t.Errorf("solution should have been optimal")
 		}
 
 		// ignore numerical inaccuracies
-		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
-			t.Errorf("objective function value did not match expectation: %v != %v", res.GetObjectiveValue(), expected_obj)
+		if math.Abs(res.ObjectiveValue()-expected_obj) > epsilon {
+			t.Errorf("objective function value did not match expectation: %v != %v", res.ObjectiveValue(), expected_obj)
 		}
 		for i, x := range []*Variable{x1, x2, x3, x4} {
-			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
-				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
+			if math.Abs(res.Value(x)-expected_xs[i]) > epsilon {
+				t.Errorf("result of %s did not match expectation: %f != %f", x.Name(), res.Value(x), expected_xs[i])
 			}
 		}
 	}
@@ -139,17 +145,17 @@ func TestSolveLP(t *testing.T) {
 		expected_xs := []float64{5, 4, 0}
 		expected_obj := 13.0
 
-		if res.GetStatus() != SolutionOptimal {
+		if res.Status() != SolutionOptimal {
 			t.Errorf("solution should have been optimal")
 		}
 
 		// ignore numerical inaccuracies
-		if math.Abs(res.GetObjectiveValue()-expected_obj) > epsilon {
-			t.Errorf("objective function value did not match expectation: %f != %f", res.GetObjectiveValue(), expected_obj)
+		if math.Abs(res.ObjectiveValue()-expected_obj) > epsilon {
+			t.Errorf("objective function value did not match expectation: %f != %f", res.ObjectiveValue(), expected_obj)
 		}
 		for i, x := range []*Variable{x1, x2, x3} {
-			if math.Abs(res.GetValue(x)-expected_xs[i]) > epsilon {
-				t.Errorf("result of %s did not match expectation: %f != %f", x.GetName(), res.GetValue(x), expected_xs[i])
+			if math.Abs(res.Value(x)-expected_xs[i]) > epsilon {
+				t.Errorf("result of %s did not match expectation: %f != %f", x.Name(), res.Value(x), expected_xs[i])
 			}
 		}
 	}

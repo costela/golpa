@@ -85,36 +85,45 @@ func (e SolveError) Error() string {
 	}
 }
 
-// GetStatus reports if the solution is optimal (SolutionOptimal) or
+// Status reports if the solution is optimal (SolutionOptimal) or
 // not (SolutionSuboptimal)
-func (res SolveResult) GetStatus() SolveStatus {
+func (res SolveResult) Status() SolveStatus {
 	return res.status
 }
 
-// GetValue returns the computed value of the given variable for this
+// Value returns the computed value of the given variable for this
 // optimization result.
-// This is a shorthand for GetPrimalValue.
-func (res SolveResult) GetValue(v *Variable) float64 {
-	return res.GetPrimalValue(v)
+// This is a shorthand for PrimalValue.
+func (res SolveResult) Value(v *Variable) float64 {
+	return res.PrimalValue(v)
 }
 
-// GetPrimalValue returns the computed value of the given variable for
+// PrimalValue returns the computed value of the given variable for
 // this optimization result.
-func (res SolveResult) GetPrimalValue(v *Variable) float64 {
+func (res SolveResult) PrimalValue(v *Variable) float64 {
+	res.model.mu.RLock()
+	defer res.model.mu.RUnlock()
+
 	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
-	return float64(C.get_var_primalresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
+	return float64(C.get_var_primalresult(res.model.prob, C.int(v.index+v.model.ConstraintCount()+1)))
 }
 
-// GetDualValue returns the dual value of the given variable in this
+// DualValue returns the dual value of the given variable in this
 // optimization result.
-func (res SolveResult) GetDualValue(v *Variable) float64 {
+func (res SolveResult) DualValue(v *Variable) float64 {
+	res.model.mu.RLock()
+	defer res.model.mu.RUnlock()
+
 	// get_var_*result uses funny indexing: 0=objective,1 to Nrows=constraint,Nrows to Nrows+Ncols=variable
-	return float64(C.get_var_dualresult(res.model.prob, C.int(v.index+v.model.GetConstraintCount()+1)))
+	return float64(C.get_var_dualresult(res.model.prob, C.int(v.index+v.model.ConstraintCount()+1)))
 }
 
-// GetObjectiveValue returns the value of the objective function for
-// this optimization result. This value is only optimal if GetStatus
+// ObjectiveValue returns the value of the objective function for
+// this optimization result. This value is only optimal if Status
 // also returns SolutionOptimal.
-func (res SolveResult) GetObjectiveValue() float64 {
+func (res SolveResult) ObjectiveValue() float64 {
+	res.model.mu.RLock()
+	defer res.model.mu.RUnlock()
+
 	return float64(C.get_objective(res.model.prob))
 }
