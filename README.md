@@ -9,14 +9,12 @@ Since the intention is providing a simpler interface, the underlying API is not 
 
 # Dependencies
 
-You need the liblpsolve55-dev (Debian variants) or lpsolve-devel (Red Hat variants) package installed in order to be able to compile GoLPA.
+GoLPA requires the lp\_solve libraries to be accessible. On Linux systems, this means the liblpsolve55-dev (Debian, etc) or lpsolve-devel (Red Hat, etc) package must be installed.
 
 # Installing
 
-If you have a properly set up GOPATH, just run:
-
 ```bash
-$ go get github.com/costela/golpa/golpa
+$ go get github.com/costela/golpa
 ```
 
 # Example usage
@@ -67,9 +65,9 @@ The model can than be solved and the resulting values can than be retrieved as f
   ⋮
   result, _ := model.Solve() // you should check for errors
 
-  fmt.Printf("solution optimal? %t", result.GetStatus() == golpa.SolutionOptimal)
-  fmt.Printf("z = %f\n", result.GetObjectiveValue())
-  fmt.Printf("x1 = %f\n", result.GetValue(x1))
+  fmt.Printf("solution optimal? %t", result.Status() == golpa.SolutionOptimal)
+  fmt.Printf("z = %f\n", result.ObjectiveValue())
+  fmt.Printf("x1 = %f\n", result.Value(x1))
   ⋮
 }
 
