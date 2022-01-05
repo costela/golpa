@@ -1,5 +1,5 @@
 /*
-Copyright © 2015 Leo Antunes <leo@costela.net>
+Copyright © 2015-2022 Leo Antunes <leo@costela.net>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -181,7 +181,7 @@ func TestBig(t *testing.T) {
 
 // Try to detect non-reentrant code in underlying lib
 func TestParallel(t *testing.T) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	runtime.GOMAXPROCS(2)
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {

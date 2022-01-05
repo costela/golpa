@@ -1,5 +1,5 @@
 /*
-Copyright © 2015 Leo Antunes <leo@costela.net>
+Copyright © 2015-2022 Leo Antunes <leo@costela.net>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -74,6 +74,7 @@ package golpa
 // #include <lp_lib.h>
 // #include <stdlib.h>
 import "C"
+
 import (
 	"fmt"
 	"math"
@@ -192,8 +193,8 @@ func (model *Model) AddDefinedVariable(name string, varType VariableType, coeffi
 	// we pass an array filled with zeroes to add_column, so the new
 	// variable is assumed to not be used in the existing constraints
 	C.add_columnex(model.prob, 0, nil, nil)
-	//coef_array := make([]C.REAL, model.GetConstraintCount()+1)
-	//C.add_column(model.prob, &coef_array[0])
+	// coef_array := make([]C.REAL, model.GetConstraintCount()+1)
+	// C.add_column(model.prob, &coef_array[0])
 
 	c_name := C.CString(name)
 	defer C.free(unsafe.Pointer(c_name))

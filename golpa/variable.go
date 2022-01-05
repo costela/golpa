@@ -1,5 +1,5 @@
 /*
-Copyright © 2015 Leo Antunes <leo@costela.net>
+Copyright © 2015-2022 Leo Antunes <leo@costela.net>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -1,5 +1,5 @@
 /*
-Copyright © 2015 Leo Antunes <leo@costela.net>
+Copyright © 2015-2022 Leo Antunes <leo@costela.net>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ const (
 	ErrorBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
 	ErrorUserAbort        = SolveError(C.USERABORT) // should not be seen: we don't use C.put_abortfunc
 	ErrorTimeout          = SolveError(C.TIMEOUT)   // should not be seen: we don't support C.set_timeout (yet!)
-	//ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
+	// ErrorPresolved        = SolveError(C.PRESOLVED) // we can't use C.set_presolve because it might remove variables
 )
 
 // Error returns a string representation of the given error value.
@@ -69,7 +69,7 @@ func (e SolveError) Error() string {
 		return "aborted by user abort function "
 	case ErrorTimeout:
 		return "timeout occurred before any integer solution could be found"
-	//case ErrorPresolved:
+	// case ErrorPresolved:
 	case ErrorBranchCutFail:
 		return "branch-and-cut failure"
 	case ErrorBranchCutBreak:
