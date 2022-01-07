@@ -69,8 +69,9 @@ The model can than be solved and the resulting values can than be retrieved as f
 */
 package golpa
 
-// #cgo CFLAGS: -I/usr/include/lpsolve/
-// #cgo LDFLAGS: -llpsolve55 -lm -ldl -lcolamd
+// #cgo linux LDFLAGS: -llpsolve55
+// #cgo darwin LDFLAGS: -L/usr/local/lib -llpsolve55
+// #cgo darwin CFLAGS: -I/usr/local/include
 // #include <lp_lib.h>
 // #include <stdlib.h>
 /*
