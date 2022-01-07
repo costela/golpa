@@ -1,0 +1,30 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  build:
+    strategy:
+      matrix:
+        go: [ '1.15.x', '1.16.x', '1.17.x' ]
+        os: [ubuntu-latest, macos-latest]
+    name: ${{ matrix.os }}/go${{ matrix.go }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - if: startsWith(matrix.os, 'macos')
+        run: brew update
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      
+      - uses: actions/checkout@v2
+      
+      - name: Install deps
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y liblpsolve55-dev
+
+      - name: Install deps
+        if: matrix.os == 'macos-latest'
+        run: brew install suite-sparse brewsci/science/lp_solve
+
+      - run: go test -race -v ./...
