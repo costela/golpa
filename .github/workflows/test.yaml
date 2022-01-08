@@ -16,9 +16,9 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
-      
+
       - uses: actions/checkout@v2
-      
+
       - name: Install deps
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y liblpsolve55-dev
