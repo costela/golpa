@@ -40,7 +40,6 @@ const (
 type SolveError C.int
 
 const (
-	ErrAccuracy         = SolveError(C.ACCURACYERROR)
 	ErrBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
 	ErrBranchCutFail    = SolveError(C.PROCFAIL)
 	ErrFeasibleFound    = SolveError(C.FEASFOUND)
@@ -58,8 +57,6 @@ const (
 // Error returns a string representation of the given error value.
 func (e SolveError) Error() string {
 	switch e {
-	case ErrAccuracy:
-		return "accuracy error encountered"
 	case ErrBranchCutBreak:
 		return "branch-and-cut stopped at beakpoint"
 	case ErrBranchCutFail:
