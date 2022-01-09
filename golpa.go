@@ -75,7 +75,9 @@ package golpa
 // #include <lp_lib.h>
 // #include <stdlib.h>
 /*
-extern int abortCallback(lprec *lp, void *userhandle); // https://golang.org/issue/19837
+// https://golang.org/issue/19837
+extern int abortCallback(lprec *lp, void *userhandle);
+extern void logCallback(lprec *lp, void *userhandle, char *buf);
 */
 import "C"
 
@@ -92,9 +94,10 @@ import (
 /* Types */
 
 type Model struct {
-	mu   sync.RWMutex
-	prob *C.lprec
-	vars []*Variable
+	mu     sync.RWMutex
+	prob   *C.lprec
+	vars   []*Variable
+	logger Logger
 }
 
 type direction C.uchar
@@ -109,7 +112,7 @@ const (
 // NewModel instantiates a new linear programming model, providing a
 // name (purely informational) and a optimization direction (either
 // Minimize or Maximize)
-func NewModel(name string, dir direction) *Model {
+func NewModel(name string, dir direction, opts ...Option) (*Model, error) {
 	prob := C.make_lp(0, 0)
 
 	c_name := C.CString(name)
@@ -119,16 +122,40 @@ func NewModel(name string, dir direction) *Model {
 	C.set_sense(prob, C.uchar(dir))
 
 	model := &Model{
-		prob: prob,
+		prob:   prob,
+		logger: noopLogger{},
 	}
 
-	C.set_verbose(prob, C.FALSE) // FIXME: use put_logfunc to *really* silence the lib
+	for _, opt := range opts {
+		if err := opt(model); err != nil {
+			return nil, fmt.Errorf("applying model option: %w", err)
+		}
+	}
+
+	model.finishInitialization()
+
+	return model, nil
+}
+
+// finishInitialization performs steps that are common to NewModel() and Clone().
+func (model *Model) finishInitialization() {
+	// disable stdoud logging and redirect to out internal logger
+	C.put_logfunc(model.prob, (*C.lphandlestr_func)(C.logCallback), saveRef(model))
+	C.set_outputfile(model.prob, C.CString(""))
 
 	// plug the underlying C library's destructors to the instance of Model,
 	// otherwise we get a memory-leak of the underlying struct
 	runtime.SetFinalizer(model, finalizeModel)
+}
 
-	return model
+//export logCallback
+func logCallback(prob *C.lprec, modelPtr unsafe.Pointer, msg *C.char) {
+	model, ok := loadRef(modelPtr).(*Model)
+	if !ok {
+		return
+	}
+
+	model.logger.Print(C.GoString(msg))
 }
 
 // finalizeModel is the function registered to be called upon garbage-
@@ -145,7 +172,8 @@ func (model *Model) Clone() *Model {
 	newProb := C.copy_lp(model.prob)
 	newVars := make([]*Variable, len(model.vars))
 	newModel := &Model{
-		prob: newProb,
+		prob:   newProb,
+		logger: model.logger,
 	}
 
 	for i, v := range model.vars {
@@ -154,6 +182,10 @@ func (model *Model) Clone() *Model {
 			index: v.index,
 		}
 	}
+
+	newModel.vars = newVars
+
+	newModel.finishInitialization()
 
 	return newModel
 }
@@ -349,8 +381,8 @@ func (model *Model) Solve() (res *SolveResult, err error) {
 
 //export abortCallback
 func abortCallback(prob *C.lprec, ctxPtr unsafe.Pointer) C.int {
-	ctx := loadContext(ctxPtr)
-	if ctx.Err() != nil {
+	ctx, ok := loadRef(ctxPtr).(context.Context)
+	if ok && ctx.Err() != nil {
 		return C.TRUE
 	}
 
@@ -361,7 +393,7 @@ func abortCallback(prob *C.lprec, ctxPtr unsafe.Pointer) C.int {
 // aborted and the context error will be returned.
 // Note that if some solution has already been found, res.Status() will be SolutionSuboptimal.
 func (model *Model) SolveWithContext(ctx context.Context) (res *SolveResult, err error) {
-	C.put_abortfunc(model.prob, (*C.lphandle_intfunc)(C.abortCallback), saveContext(ctx))
+	C.put_abortfunc(model.prob, (*C.lphandle_intfunc)(C.abortCallback), saveRef(ctx))
 	defer C.put_abortfunc(model.prob, nil, nil)
 
 	ret, err := model.Solve()

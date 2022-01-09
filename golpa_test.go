@@ -18,7 +18,6 @@ package golpa
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -26,10 +25,13 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
-	epsilon = 0.0000001 // acceptable numerical deviation for test results
+	delta = 0.0000001 // acceptable numerical deviation for test results
 )
 
 var (
@@ -42,16 +44,17 @@ func getBigModelCopy(t *testing.T) *Model {
 
 	bigModelOnce.Do(func() {
 		num_vars := 10000
-		model := NewModel("test", Maximize)
+		model, err := NewModel("testBig", Maximize)
+		require.NoError(t, err)
+
 		vars := make([]*Variable, num_vars)
 		coefs := make([]float64, num_vars)
 		for i := 0; i < num_vars; i++ {
 			v, _ := model.AddIntegerVariable(fmt.Sprintf("x%d", i))
 			vars[i] = v
 			coefs[i] = 1
-			if err := model.AddConstraint(-float64(i), float64(i), []*Variable{v}, []float64{1}); err != nil {
-				t.Fatalf("could not add contraint: %v", err)
-			}
+			err := model.AddConstraint(-float64(i), float64(i), []*Variable{v}, []float64{1})
+			require.NoError(t, err)
 		}
 
 		bigModel = model
@@ -62,54 +65,61 @@ func getBigModelCopy(t *testing.T) *Model {
 
 func TestInstantiation(t *testing.T) {
 	name := "test model 1"
-	model := NewModel(name, Maximize)
-	if model.Name() != name {
-		t.Fatal("model name did not survive instantiation")
-	}
-	if model.Direction() != Maximize {
-		t.Fatal("optimization direction did not survive instantiation")
-	}
+	model, err := NewModel(name, Maximize)
+	require.NoError(t, err)
+
+	assert.Equal(t, name, model.Name())
+	assert.Equal(t, Maximize, model.Direction())
+}
+
+func TestClone(t *testing.T) {
+	name := "test model 1"
+	model, err := NewModel(name, Maximize)
+	require.NoError(t, err)
+
+	v, err := model.AddDefinedVariable("x", ContinuousVariable, 1, 2, 3)
+	require.NoError(t, err)
+
+	err = model.AddConstraint(0, 1, []*Variable{v}, []float64{1})
+	require.NoError(t, err)
+
+	modelClone := model.Clone()
+
+	assert.Equal(t, model.Name(), modelClone.Name())
+	assert.Equal(t, model.Direction(), modelClone.Direction())
+	assert.Equal(t, model.VariableCount(), modelClone.VariableCount())
+	assert.Equal(t, model.ConstraintCount(), modelClone.ConstraintCount())
 }
 
 func TestAddVariableWithDetails(t *testing.T) {
-	model := NewModel("test", Maximize)
+	model, err := NewModel("test", Maximize)
+	require.NoError(t, err)
+
 	v1, err := model.AddDefinedVariable("x", BinaryVariable, 3.1416, 0, 1)
-	if err != nil {
-		t.Fatalf("could not add defined variable: %s", err)
-	}
-	if v1.Name() != "x" {
-		t.Fatal("variable name did not survive instantiation")
-	}
-	if v1.Type() != BinaryVariable {
-		t.Fatal("variable type did not survive instantiation")
-	}
-	if v1.Coefficient() != 3.1416 {
-		t.Fatal("variable coefficient did not survive instantiation")
-	}
-	if l, h := v1.Bounds(); l != 0 || h != 1 {
-		t.Fatal("variable bounds did not survive instantiation")
-	}
+	require.NoError(t, err)
+
+	assert.Equal(t, "x", v1.Name())
+	assert.Equal(t, BinaryVariable, v1.Type())
+	assert.Equal(t, 3.1416, v1.Coefficient())
+	l, h := v1.Bounds()
+	assert.Equal(t, 0.0, l)
+	assert.Equal(t, 1.0, h)
 
 	v2, err := model.AddDefinedVariable("y", ContinuousVariable, -1, math.Inf(-1), 5)
-	if err != nil {
-		t.Fatalf("could not add defined variable: %s", err)
-	}
-	if v2.Name() != "y" {
-		t.Fatal("variable name did not survive instantiation")
-	}
-	if v2.Type() != ContinuousVariable {
-		t.Fatal("variable type did not survive instantiation")
-	}
-	if v2.Coefficient() != -1 {
-		t.Fatal("variable coefficient did not survive instantiation")
-	}
-	if l, h := v2.Bounds(); l != math.Inf(-1) || h != 5 {
-		t.Fatal("variable bounds did not survive instantiation")
-	}
+	require.NoError(t, err)
+
+	assert.Equal(t, "y", v2.Name())
+	assert.Equal(t, ContinuousVariable, v2.Type())
+	assert.Equal(t, -1.0, v2.Coefficient())
+	l, h = v2.Bounds()
+	assert.Equal(t, math.Inf(-1), l)
+	assert.Equal(t, 5.0, h)
 }
 
 func TestSetObjectiveFunction(t *testing.T) {
-	model := NewModel("test", Maximize)
+	model, err := NewModel("test", Maximize)
+	require.NoError(t, err)
+
 	v1, _ := model.AddVariable("x")
 	v2, _ := model.AddVariable("y")
 	v2.SetType(IntegerVariable)
@@ -120,14 +130,14 @@ func TestSetObjectiveFunction(t *testing.T) {
 	coefs := []float64{1.3, 2.7182, 3.1416}
 	model.SetObjectiveFunction(coefs, vars)
 	for i, coef := range coefs {
-		if vars[i].Coefficient() != coef {
-			t.Fatalf("%v coefficient not set correctly while defining objective function", v1)
-		}
+		assert.Equal(t, coef, vars[i].Coefficient())
 	}
 }
 
 func TestSolveMIP(t *testing.T) {
-	model := NewModel("test", Maximize)
+	model, err := NewModel("test", Maximize)
+	require.NoError(t, err)
+
 	x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, 40)
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, 3, 0, math.Inf(1))
@@ -137,30 +147,26 @@ func TestSolveMIP(t *testing.T) {
 	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{1, -3, 1})
 	model.AddConstraint(0, 0, []*Variable{x2, x4}, []float64{1, -3.5})
 
-	if res, err := model.Solve(); err != nil {
-		t.Fatalf("model solving failed: %s", err)
-	} else {
-		expected_xs := []float64{40, 10.5, 19.5, 3}
-		expected_obj := 122.5
+	res, err := model.Solve()
+	require.NoError(t, err)
 
-		if res.Status() != SolutionOptimal {
-			t.Errorf("solution should have been optimal")
-		}
+	expected_xs := []float64{40, 10.5, 19.5, 3}
+	expected_obj := 122.5
 
-		// ignore numerical inaccuracies
-		if math.Abs(res.ObjectiveValue()-expected_obj) > epsilon {
-			t.Errorf("objective function value did not match expectation: %v != %v", res.ObjectiveValue(), expected_obj)
-		}
-		for i, x := range []*Variable{x1, x2, x3, x4} {
-			if math.Abs(res.Value(x)-expected_xs[i]) > epsilon {
-				t.Errorf("result of %s did not match expectation: %f != %f", x.Name(), res.Value(x), expected_xs[i])
-			}
-		}
+	assert.Equal(t, SolutionOptimal, res.Status())
+
+	// ignore numerical inaccuracies
+	assert.InDelta(t, expected_obj, res.ObjectiveValue(), delta)
+
+	for i, x := range []*Variable{x1, x2, x3, x4} {
+		assert.InDelta(t, expected_xs[i], res.Value(x), delta)
 	}
 }
 
 func TestSolveLP(t *testing.T) {
-	model := NewModel("test", Maximize)
+	model, err := NewModel("test", Maximize)
+	require.NoError(t, err)
+
 	x1, _ := model.AddDefinedVariable("x1", ContinuousVariable, 1, 0, math.Inf(1))
 	x2, _ := model.AddDefinedVariable("x2", ContinuousVariable, 2, 0, math.Inf(1))
 	x3, _ := model.AddDefinedVariable("x3", ContinuousVariable, -1, 0, math.Inf(1))
@@ -169,25 +175,19 @@ func TestSolveLP(t *testing.T) {
 	model.AddConstraint(0, 28, []*Variable{x1, x2, x3}, []float64{4, 2, 3})
 	model.AddConstraint(0, 30, []*Variable{x1, x2, x3}, []float64{2, 5, 5})
 
-	if res, err := model.Solve(); err != nil {
-		t.Fatalf("model solving failed: %s", err)
-	} else {
-		expected_xs := []float64{5, 4, 0}
-		expected_obj := 13.0
+	res, err := model.Solve()
+	require.NoError(t, err)
 
-		if res.Status() != SolutionOptimal {
-			t.Errorf("solution should have been optimal")
-		}
+	expected_xs := []float64{5, 4, 0}
+	expected_obj := 13.0
 
-		// ignore numerical inaccuracies
-		if math.Abs(res.ObjectiveValue()-expected_obj) > epsilon {
-			t.Errorf("objective function value did not match expectation: %f != %f", res.ObjectiveValue(), expected_obj)
-		}
-		for i, x := range []*Variable{x1, x2, x3} {
-			if math.Abs(res.Value(x)-expected_xs[i]) > epsilon {
-				t.Errorf("result of %s did not match expectation: %f != %f", x.Name(), res.Value(x), expected_xs[i])
-			}
-		}
+	assert.Equal(t, SolutionOptimal, res.Status())
+
+	// ignore numerical inaccuracies
+	assert.InDelta(t, expected_obj, res.ObjectiveValue(), delta)
+
+	for i, x := range []*Variable{x1, x2, x3} {
+		assert.InDelta(t, expected_xs[i], res.Value(x), delta)
 	}
 }
 
@@ -199,14 +199,10 @@ func TestBig(t *testing.T) {
 	model := getBigModelCopy(t)
 
 	res, err := model.Solve()
-	if err != nil {
-		t.Fatalf("error solving model: %v", err)
-	}
+	require.NoError(t, err)
 
 	expected := 49995000.0
-	if val := res.ObjectiveValue(); val != expected {
-		t.Fatalf("model did not maximize to expected value: %f != %f", val, expected)
-	}
+	assert.Equal(t, expected, res.ObjectiveValue())
 }
 
 func TestContext(t *testing.T) {
@@ -216,9 +212,7 @@ func TestContext(t *testing.T) {
 	defer cancel()
 
 	_, err := model.SolveWithContext(ctx)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected timeout solving model, got: %v", err)
-	}
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 // Try to detect non-reentrant code in underlying lib

@@ -35,7 +35,7 @@ type Variable struct {
 type VariableType int
 
 const (
-	ContinuousVariable = iota
+	ContinuousVariable VariableType = iota
 	IntegerVariable
 	BinaryVariable
 )
