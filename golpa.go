@@ -78,10 +78,12 @@ package golpa
 // https://golang.org/issue/19837
 extern int abortCallback(lprec *lp, void *userhandle);
 extern void logCallback(lprec *lp, void *userhandle, char *buf);
+extern int lpexCallback(void *userhandle, char *buf);
 */
 import "C"
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -412,4 +414,32 @@ func (model *Model) SolveWithContext(ctx context.Context) (res *SolveResult, err
 	}
 
 	return ret, err
+}
+
+//export lpexCallback
+func lpexCallback(bufPtr unsafe.Pointer, buf *C.char) C.int {
+	strBuf, ok := loadRef(bufPtr).(*bytes.Buffer)
+	if !ok {
+		return 0
+	}
+
+	strBuf.WriteString(C.GoString(buf))
+
+	return 0
+}
+
+// ExportLP returns the model in lp format.
+func (model *Model) ExportLP() (string, error) {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
+	buf := bytes.Buffer{}
+
+	ret := C.write_lpex(model.prob, saveRef(&buf), (*C.write_modeldata_func)(C.lpexCallback))
+
+	if ret != C.TRUE {
+		return "", fmt.Errorf("model not written successfully")
+	}
+
+	return buf.String(), nil
 }
