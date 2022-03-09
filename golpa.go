@@ -244,12 +244,15 @@ func (model *Model) Variables() []*Variable {
 // A variable is bound to its model. Attempting to use a variable
 // created in one model for fetching solutions from a different model
 // results in undefined behaviour.
+//
+// Empty names will automatically replaced by a unique name.
 func (model *Model) AddVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, ContinuousVariable, 1, math.Inf(-1), math.Inf(1))
 }
 
 // AddBinaryVariable is a convenience function for adding a single
 // named binary variable to the model, with a default coefficient of 1.
+// Empty names will automatically replaced by a unique name.
 func (model *Model) AddBinaryVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, BinaryVariable, 1, 0, 1)
 }
@@ -257,6 +260,7 @@ func (model *Model) AddBinaryVariable(name string) (v *Variable, err error) {
 // AddIntegerVariable is a convenience function for adding a single
 // named unbounded integer variable to the model, with a default
 // objective coefficient of 1.
+// Empty names will automatically replaced by a unique name.
 func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 	return model.AddDefinedVariable(name, IntegerVariable, 1, math.Inf(-1), math.Inf(1))
 }
@@ -264,6 +268,7 @@ func (model *Model) AddIntegerVariable(name string) (v *Variable, err error) {
 // AddDefinedVariable add a variable to the linear programming model
 // with its attributes passed as arguments.
 // If varType is BinaryVariable, the bounds are ignored.
+// Empty names will automatically replaced by a unique name.
 func (model *Model) AddDefinedVariable(name string, varType VariableType, coefficient, lowerBound, upperBound float64) (v *Variable, err error) {
 	size := model.VariableCount()
 
@@ -282,6 +287,10 @@ func (model *Model) AddDefinedVariable(name string, varType VariableType, coeffi
 		C.add_columnex(model.prob, 0, nil, nil)
 		// coef_array := make([]C.REAL, model.ConstraintCount()+1)
 		// C.add_column(model.prob, &coef_array[0])
+
+		if name == "" {
+			name = fmt.Sprintf("V%d", size)
+		}
 
 		c_name := C.CString(name)
 		defer C.free(unsafe.Pointer(c_name))
