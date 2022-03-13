@@ -39,36 +39,35 @@ can be expressed with GoLPA like this:
 package main
 
 import (
-    "github.com/costela/golpa/golpa"
-    "math"
-    "fmt"
+	"fmt"
+	"math"
+
+	"github.com/costela/golpa"
 )
 
 func main() {
-  model := golpa.NewModel("some model", golpa.Maximize)
-  x1, _ := model.AddVariable("x1")
-  x1.SetBounds(0, 40)
-  x2, _ := model.AddVariable("x2")
-  x2.SetObjectiveCoefficient(2)
-  // alternatively, all information pertaining can be given at once:
-  x3, _ := model.AddDefinedVariable("x3", golpa.ContinuousVariable, 3, 5, 11)
+	model, _ := golpa.NewModel("some model", golpa.Maximize)
+	x1, _ := model.AddVariable("x1")
+	x1.SetBounds(0, 40)
+	x2, _ := model.AddVariable("x2")
+	x2.SetObjectiveCoefficient(2)
+	// alternatively, all information pertaining can be given at once:
+	x3, _ := model.AddDefinedVariable("x3", golpa.ContinuousVariable, 3, 5, 11)
 
-  model.AddConstraint(0, 10, []*golpa.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
-  model.AddConstraint(math.Inf(-1), 20, []*golpa.Variable{x1, x2, x3}, []float64{2, -5, 3})
-  model.AddConstraint(0, 0, []*golpa.Variable{x1, x3}, []float64{1, -8})
-  ⋮
-```
+	model.AddConstraint(0, 10, []*golpa.Variable{x1, x2, x3}, []float64{-1, 1, 5.3})
+	model.AddConstraint(math.Inf(-1), 20, []*golpa.Variable{x1, x2, x3}, []float64{2, -5, 3})
+	model.AddConstraint(0, 0, []*golpa.Variable{x1, x3}, []float64{1, -8})
 
-The model can than be solved and the resulting values can than be retrieved as follows:
+	// ⋮
+	// The model can than be solved and the resulting values can than be retrieved as follows:
+	// ⋮
 
-```go
-  ⋮
-  result, _ := model.Solve() // you should check for errors
+	result, _ := model.Solve() // you should check for errors
 
-  fmt.Printf("solution optimal? %t", result.Status() == golpa.SolutionOptimal)
-  fmt.Printf("z = %f\n", result.ObjectiveValue())
-  fmt.Printf("x1 = %f\n", result.Value(x1))
-  ⋮
+	fmt.Printf("solution optimal? %t\n", result.Status() == golpa.SolutionOptimal)
+	fmt.Printf("z = %f\n", result.ObjectiveValue())
+	fmt.Printf("x1 = %f\n", result.Value(x1))
+	// ⋮
 }
 
 ```
