@@ -40,7 +40,7 @@ const (
 type SolveError C.int
 
 const (
-	ErrBranchCutBreak   = SolveError(C.PROCBREAK) // should not be seen: we don't use set_break_at_first/set_break_at_value
+	ErrBranchCutBreak   = SolveError(C.PROCBREAK)
 	ErrBranchCutFail    = SolveError(C.PROCFAIL)
 	ErrFeasibleFound    = SolveError(C.FEASFOUND)
 	ErrModelDegenerate  = SolveError(C.DEGENERATE)
