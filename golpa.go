@@ -444,3 +444,12 @@ func (model *Model) ExportLP() (string, error) {
 
 	return buf.String(), nil
 }
+
+// SetTarget sets the optimization target for the model.
+// The solver will return early if this target is reached.
+func (model *Model) SetTarget(target float64) {
+	model.mu.RLock()
+	defer model.mu.RUnlock()
+
+	C.set_break_at_value(model.prob, C.double(target))
+}
